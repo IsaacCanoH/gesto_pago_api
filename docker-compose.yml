@@ -1,0 +1,23 @@
+version: '3'
+
+services:
+  gestopagodb:
+    container_name: gestopago
+    image: postgres:16.4
+    restart: always
+    volumes:
+      - ./postgres:/var/lib/postgresql/data
+    ports:
+      - 5434:5432
+    environment:
+      - POSTGRES_USER=postgres
+      - POSTGRES_PASSWORD=postgres
+      - POSTGRES_DB=gestopagodb
+
+  redis:
+    container_name: gestopagoredis
+    image: redis:7.4.11-alpine
+    restart: always
+    ports:
+      - 6380:6379
+
