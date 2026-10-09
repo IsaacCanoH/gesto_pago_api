@@ -14,9 +14,6 @@ public class GestoPagoAuthResponse {
 
     private Integer status;
 
-    @JsonProperty("token_type")
-    private String tokenType;
-
     @JsonProperty("expires_in")
     private Long expiresIn;
 }
