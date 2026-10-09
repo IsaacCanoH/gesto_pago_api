@@ -4,13 +4,16 @@ import jakarta.persistence.*;
 import lombok.Getter;
 import lombok.Setter;
 
-import java.time.LocalDateTime;
+import java.time.LocalDate;
+import java.time.ZoneId;
 
 @Entity
 @Table(name = "gestopago_tokens")
 @Getter
 @Setter
 public class GestoPagoToken {
+    private static final ZoneId ZONA = ZoneId.of("America/Mexico_City");
+
 
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
@@ -32,22 +35,23 @@ public class GestoPagoToken {
     private Long expiresIn;
 
     @Column(name = "fecha_creacion", nullable = false, updatable = false)
-    private LocalDateTime fechaCreacion;
+    private LocalDate fechaCreacion;
 
     @Column(name = "fecha_actualizacion", nullable = false)
-    private LocalDateTime fechaActualizacion;
+    private LocalDate fechaActualizacion;
 
     @Column(name = "activo", nullable = false)
     private Boolean activo = true;
 
     @PrePersist
     void onCreate() {
-        fechaCreacion = LocalDateTime.now();
-        fechaActualizacion = LocalDateTime.now();
+        LocalDate hoy = LocalDate.now(ZONA);
+        fechaCreacion = hoy;
+        fechaActualizacion = hoy;
     }
 
     @PreUpdate
     void onUpdate() {
-        fechaActualizacion = LocalDateTime.now();
+        fechaActualizacion = LocalDate.now(ZONA);
     }
 }

@@ -1,10 +1,9 @@
 package com.proyecto.servicios.config;
 
-import com.zaxxer.hikari.HikariConfig;
-import com.zaxxer.hikari.HikariDataSource;
-import jakarta.persistence.EntityManagerFactory;
-import lombok.extern.slf4j.Slf4j;
-import org.springframework.beans.factory.annotation.Autowired;
+import java.util.Map;
+
+import javax.sql.DataSource;
+
 import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
@@ -17,13 +16,14 @@ import org.springframework.orm.jpa.vendor.HibernateJpaVendorAdapter;
 import org.springframework.transaction.PlatformTransactionManager;
 import org.springframework.transaction.annotation.EnableTransactionManagement;
 
-import javax.sql.DataSource;
-import java.util.HashMap;
-import java.util.Map;
+import com.zaxxer.hikari.HikariConfig;
+import com.zaxxer.hikari.HikariDataSource;
 
+import jakarta.persistence.EntityManagerFactory;
+import lombok.RequiredArgsConstructor;
 
-@Slf4j
 @Configuration
+@RequiredArgsConstructor
 @EnableTransactionManagement
 @EnableJpaRepositories(
         basePackages = {
@@ -31,65 +31,51 @@ import java.util.Map;
                 "com.proyecto.servicios.repositorys.gestopago"
         },
         transactionManagerRef = "sfTransactionManager",
-        entityManagerFactoryRef = "sfEntityManagerFactory"
-)
+        entityManagerFactoryRef = "sfEntityManagerFactory")
 public class ConfigDB {
-    @Autowired
-    private Environment env;
+    private final Environment env;
 
-    @Bean(name="sfDatasource")
-    public DataSource sfDatasource(){
-        HikariConfig config=new HikariConfig();
-        try{
-            config.setJdbcUrl(env.getProperty("spring.datasource.url"));
-            config.setPassword(env.getProperty("spring.datasource.password"));
-            config.setUsername(env.getProperty("spring.datasource.username"));
-            config.setMaximumPoolSize(10);
-            config.setMaxLifetime(18800);
-            config.setConnectionTimeout(5000);
-            config.setValidationTimeout(5000);
-            config.setMinimumIdle(2);
-            config.setConnectionTestQuery("SELECT 1");
-            config.setPoolName("sfDatasource");
-
-        }catch (Exception e){
-            log.error("Ha ocurrido un error en la conexcion a base de datos, a causa de:",e);
-            return null;
-        }
+    @Bean(name = "sfDatasource")
+    public DataSource sfDatasource() {
+        HikariConfig config = new HikariConfig();
+        config.setJdbcUrl(env.getRequiredProperty("spring.datasource.url"));
+        config.setUsername(env.getRequiredProperty("spring.datasource.username"));
+        config.setPassword(env.getRequiredProperty("spring.datasource.password"));
+        config.setMaximumPoolSize(env.getProperty(
+                "spring.datasource.hikari.maximum-pool-size", Integer.class, 10));
+        config.setConnectionTimeout(env.getProperty(
+                "spring.datasource.hikari.connection-timeout", Long.class, 5000L));
+        config.setMaxLifetime(env.getProperty(
+                "spring.datasource.hikari.max-lifetime", Long.class, 1800000L));
+        config.setPoolName("sfDatasource");
         return new HikariDataSource(config);
     }
 
-    @Bean(name="sfEntityManagerFactory")
+    @Bean(name = "sfEntityManagerFactory")
     @DependsOn("flyway")
-    public LocalContainerEntityManagerFactoryBean sfEntityManagerFactory(){
-        LocalContainerEntityManagerFactoryBean em= new LocalContainerEntityManagerFactoryBean();
-        try{
-          em.setDataSource(sfDatasource());
-          em.setPackagesToScan(
-                  "com.proyecto.servicios.entity.sf",
-                  "com.proyecto.servicios.entity.gestopago"
-          );
-          em.setPersistenceUnitName("sfDatasource");
-            HibernateJpaVendorAdapter vendorAdapter = new HibernateJpaVendorAdapter();
-            em.setJpaVendorAdapter(vendorAdapter);
-          Map<String, Object> properties=new HashMap<>();
-          properties.put("hibernate.hbm2ddl.auto", "none");
-            properties.put("hibernate.show-sql", false);
-            properties.put("hibernate.dialect", "org.hibernate.dialect.PostgreSQLDialect");
-            properties.put("jakarta.persistence.query.timeout", 600000);
-
-
-        } catch (Exception e) {
-            log.error("Ha ocurrido un error en la conexion a base de datos, a causa de:",e);
-            return null;
-
-        }
-        return em;
+    public LocalContainerEntityManagerFactoryBean sfEntityManagerFactory(
+            @Qualifier("sfDatasource") DataSource dataSource) {
+        LocalContainerEntityManagerFactoryBean factory =
+                new LocalContainerEntityManagerFactoryBean();
+        factory.setDataSource(dataSource);
+        factory.setPackagesToScan(
+                "com.proyecto.servicios.entity.sf",
+                "com.proyecto.servicios.entity.gestopago");
+        factory.setPersistenceUnitName("sfDatasource");
+        factory.setJpaVendorAdapter(new HibernateJpaVendorAdapter());
+        factory.setJpaPropertyMap(Map.of(
+                "hibernate.hbm2ddl.auto", "none",
+                "hibernate.show_sql", "false",
+                "hibernate.dialect", "org.hibernate.dialect.PostgreSQLDialect"));
+        return factory;
     }
- @Bean(name="sfTransactionManager")
- public PlatformTransactionManager sfTransactionManager(@Qualifier("sfEntityManagerFactory") EntityManagerFactory sfEntityManagerFactory){
-        return new JpaTransactionManager(sfEntityManagerFactory);
 
- }
-
+    @Bean(name = "sfTransactionManager")
+    public PlatformTransactionManager sfTransactionManager(
+            @Qualifier("sfEntityManagerFactory") EntityManagerFactory entityManagerFactory) {
+        JpaTransactionManager manager = new JpaTransactionManager(entityManagerFactory);
+        manager.setDefaultTimeout(env.getProperty(
+                "spring.transaction.default-timeout", Integer.class, 30));
+        return manager;
+    }
 }

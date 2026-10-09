@@ -12,8 +12,8 @@ CREATE TABLE IF NOT EXISTS gestopago_productos (
     tipo_referencia         VARCHAR(50),
     leyenda                 TEXT,
     activo                  BOOLEAN      NOT NULL DEFAULT TRUE,
-    fecha_creacion          TIMESTAMP    NOT NULL DEFAULT NOW(),
-    fecha_actualizacion     TIMESTAMP    NOT NULL DEFAULT NOW(),
+    fecha_creacion      DATE NOT NULL DEFAULT CURRENT_DATE,
+    fecha_actualizacion DATE NOT NULL DEFAULT CURRENT_DATE,
 
     CONSTRAINT uq_gestopago_productos_id_producto UNIQUE (id_producto)
 );
