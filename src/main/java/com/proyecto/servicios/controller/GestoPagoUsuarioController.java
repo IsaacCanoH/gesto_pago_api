@@ -25,7 +25,8 @@ public class GestoPagoUsuarioController {
     @GetMapping(value = "/usuarios/{id}", produces = MediaType.APPLICATION_JSON_VALUE)
     public ResponseEntity<GestoPagoUsuarioConsultaResponse> consultarUsuario(
             @PathVariable Integer id, @AuthenticationPrincipal GestoPagoPrincipal principal) {
-        return ResponseEntity.ok(usuarioService.consultarUsuario(id, principal.usuarioId()));
+        return ResponseEntity.ok(usuarioService.consultarUsuario(
+                id, principal == null ? null : principal.usuarioId()));
     }
 
     @PutMapping(value = "/usuarios/{id}/password", consumes = MediaType.APPLICATION_JSON_VALUE)
@@ -33,7 +34,8 @@ public class GestoPagoUsuarioController {
             @PathVariable Integer id,
             @AuthenticationPrincipal GestoPagoPrincipal principal,
             @Valid @RequestBody GestoPagoCambioContrasenaRequest request) {
-        usuarioService.cambiarContrasena(id, principal.usuarioId(), request);
+        usuarioService.cambiarContrasena(
+                id, principal == null ? null : principal.usuarioId(), request);
         return ResponseEntity.noContent().build();
     }
 }

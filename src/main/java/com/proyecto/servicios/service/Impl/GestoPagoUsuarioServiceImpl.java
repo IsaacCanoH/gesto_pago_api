@@ -63,7 +63,7 @@ public class GestoPagoUsuarioServiceImpl implements GestoPagoUsuarioService {
     }
 
     private void verificarPropietario(Integer id, Integer solicitanteId) {
-        if (!id.equals(solicitanteId)) {
+        if (solicitanteId != null && !id.equals(solicitanteId)) {
             throw new GestoPagoAccesoDenegadoException();
         }
     }

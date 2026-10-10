@@ -41,7 +41,7 @@ public class GestoPagoCuentaController {
     public ResponseEntity<Void> cancelarCuenta(
             @PathVariable String numeroCuenta,
             @AuthenticationPrincipal GestoPagoPrincipal principal) {
-        cuentaService.cancelarCuenta(numeroCuenta, principal.usuarioId());
+        cuentaService.cancelarCuenta(numeroCuenta, principal == null ? null : principal.usuarioId());
         return ResponseEntity.noContent().build();
     }
 }

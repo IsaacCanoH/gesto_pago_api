@@ -110,6 +110,20 @@ class GestoPagoCuentaServiceImplTest {
     }
 
     @Test
+    void cancelaCuentaSinToken() {
+        var cuenta = cuenta();
+        cuenta.setSaldo(BigDecimal.ZERO);
+        cuenta.setEstatus("ACTIVA");
+        when(cuentas.findByNumeroCuenta(cuenta.getNumeroCuenta())).thenReturn(Optional.of(cuenta));
+
+        new GestoPagoCuentaServiceImpl(cuentas, usuarios, mapper)
+                .cancelarCuenta(cuenta.getNumeroCuenta(), null);
+
+        assertEquals("INACTIVA", cuenta.getEstatus());
+        verifyNoInteractions(usuarios);
+    }
+
+    @Test
     void noCancelaCuentaAjena() {
         var cuenta = cuenta();
         cuenta.setEstatus("ACTIVA");

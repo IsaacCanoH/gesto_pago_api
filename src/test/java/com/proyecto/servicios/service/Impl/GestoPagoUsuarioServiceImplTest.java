@@ -58,6 +58,15 @@ class GestoPagoUsuarioServiceImplTest {
     }
 
     @Test
+    void consultaUsuarioSinToken() {
+        when(usuarioRepository.findById(7)).thenReturn(Optional.of(usuario));
+
+        var response = service.consultarUsuario(7, null);
+
+        assertEquals(7, response.id());
+    }
+
+    @Test
     void otroUsuarioNoConsulta() {
         assertThrows(GestoPagoAccesoDenegadoException.class,
                 () -> service.consultarUsuario(7, 8));
@@ -75,6 +84,18 @@ class GestoPagoUsuarioServiceImplTest {
 
         assertEquals("hash-nuevo", usuario.getPasswordHash());
         verify(passwordEncoder).encode("ClaveNueva2!");
+    }
+
+    @Test
+    void cambiaContrasenaSinToken() {
+        var request = new GestoPagoCambioContrasenaRequest("ClaveVieja1!", "ClaveNueva2!");
+        when(usuarioRepository.findById(7)).thenReturn(Optional.of(usuario));
+        when(passwordEncoder.matches(request.contrasenaActual(), "hash-viejo")).thenReturn(true);
+        when(passwordEncoder.encode(request.contrasenaNueva())).thenReturn("hash-nuevo");
+
+        service.cambiarContrasena(7, null, request);
+
+        assertEquals("hash-nuevo", usuario.getPasswordHash());
     }
 
     @Test

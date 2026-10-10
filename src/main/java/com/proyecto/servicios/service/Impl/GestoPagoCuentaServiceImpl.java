@@ -60,11 +60,12 @@ public class GestoPagoCuentaServiceImpl implements GestoPagoCuentaService {
     public void cancelarCuenta(String numeroCuenta, Integer usuarioId) {
         GestoPagoCuenta cuenta = cuentaRepository.findByNumeroCuenta(numeroCuenta)
                 .orElseThrow(GestoPagoCuentaNoEncontradaException::new);
-        GestoPagoUsuario usuario = usuarioRepository.findById(usuarioId)
-                .orElseThrow(GestoPagoUsuarioNoEncontradoException::new);
-
-        if (!cuenta.getCliente().getId().equals(usuario.getCliente().getId())) {
-            throw new GestoPagoAccesoDenegadoException("No puedes cancelar una cuenta de otro cliente");
+        if (usuarioId != null) {
+            GestoPagoUsuario usuario = usuarioRepository.findById(usuarioId)
+                    .orElseThrow(GestoPagoUsuarioNoEncontradoException::new);
+            if (!cuenta.getCliente().getId().equals(usuario.getCliente().getId())) {
+                throw new GestoPagoAccesoDenegadoException("No puedes cancelar una cuenta de otro cliente");
+            }
         }
         if ("INACTIVA".equals(cuenta.getEstatus())) {
             return;

@@ -65,9 +65,13 @@ class GestoPagoSecurityWebTest {
 
     @Test
     void usuarioSinToken() throws Exception {
+        when(usuarioService.consultarUsuario(7, null))
+                .thenReturn(new GestoPagoUsuarioConsultaResponse(
+                        7, 3, "cliente@example.com", true, null, null));
+
         mvc.perform(get("/usuarios/7"))
-                .andExpect(status().isUnauthorized())
-                .andExpect(jsonPath("$.codigo").value(1));
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.id").value(7));
     }
 
     @Test
@@ -116,7 +120,17 @@ class GestoPagoSecurityWebTest {
     @Test
     void clienteSinToken() throws Exception {
         mvc.perform(get("/clientes/7"))
-                .andExpect(status().isUnauthorized());
+                .andExpect(status().isOk());
+
+        verify(consultaService).consultarCliente(7);
+    }
+
+    @Test
+    void desactivaClienteSinToken() throws Exception {
+        mvc.perform(delete("/clientes/7"))
+                .andExpect(status().isNoContent());
+
+        verify(clienteService).desactivarCliente(7);
     }
 
     @Test
@@ -136,6 +150,17 @@ class GestoPagoSecurityWebTest {
     }
 
     @Test
+    void cambiaContrasenaSinToken() throws Exception {
+        mvc.perform(put("/usuarios/7/password")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"contrasenaActual\":\"ClaveVieja1!\","
+                                + "\"contrasenaNueva\":\"ClaveNueva2!\"}"))
+                .andExpect(status().isNoContent());
+
+        verify(usuarioService).cambiarContrasena(eq(7), eq(null), any());
+    }
+
+    @Test
     void cancelaCuentaConToken() throws Exception {
         when(jwtService.verificar("token-valido")).thenReturn(7);
         when(authService.obtenerPrincipalActivo(7))
@@ -149,8 +174,10 @@ class GestoPagoSecurityWebTest {
     }
 
     @Test
-    void noCancelaCuentaSinToken() throws Exception {
+    void cancelaCuentaSinToken() throws Exception {
         mvc.perform(delete("/cuentas/00000000000000000007"))
-                .andExpect(status().isUnauthorized());
+                .andExpect(status().isNoContent());
+
+        verify(cuentaService).cancelarCuenta("00000000000000000007", null);
     }
 }
