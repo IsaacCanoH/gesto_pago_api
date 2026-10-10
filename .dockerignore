@@ -1,0 +1,10 @@
+.git
+.gradle
+build
+**/build
+.env
+.env.*
+**/application.properties
+postgres
+.idea
+outputs
