@@ -1,5 +1,6 @@
 package com.proyecto.servicios.exception;
 
+import static org.hamcrest.Matchers.containsString;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.mockito.ArgumentMatchers.any;
@@ -164,7 +165,21 @@ class GestoPagoValidacionWebTest {
                         .content("{\"domicilio\":{\"codigoPostal\":\"123\"}}"))
                 .andExpect(status().isBadRequest())
                 .andExpect(jsonPath("$.mensaje").value(
-                        "Campo domicilio.codigoPostal: debe tener exactamente 5 dígitos"));
+                        "Datos no válidos: domicilio.codigoPostal: debe tener exactamente 5 dígitos"));
+        verifyNoInteractions(clienteService);
+    }
+
+    @Test
+    void informaVariosCamposInvalidosEnUnaRespuesta() throws Exception {
+        mvc.perform(post("/clientes")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"nombre\":\"\"}"))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.codigo").value(1))
+                .andExpect(jsonPath("$.mensaje", containsString("nombre: es obligatorio")))
+                .andExpect(jsonPath("$.mensaje", containsString("apellidoPaterno: es obligatorio")))
+                .andExpect(jsonPath("$.mensaje", containsString("domicilio: es obligatorio")));
+
         verifyNoInteractions(clienteService);
     }
 

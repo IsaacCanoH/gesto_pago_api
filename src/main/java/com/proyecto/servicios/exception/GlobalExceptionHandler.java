@@ -1,7 +1,6 @@
 package com.proyecto.servicios.exception;
 
 import java.time.LocalDate;
-import java.util.Comparator;
 
 import com.fasterxml.jackson.databind.exc.InvalidFormatException;
 import com.proyecto.servicios.model.GenericResponse;
@@ -11,9 +10,7 @@ import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.http.converter.HttpMessageNotReadableException;
-import org.springframework.validation.FieldError;
 import org.springframework.web.bind.MissingServletRequestParameterException;
-import org.springframework.web.bind.MethodArgumentNotValidException;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
 import org.springframework.web.method.annotation.MethodArgumentTypeMismatchException;
@@ -119,19 +116,6 @@ public class GlobalExceptionHandler {
                 return respuestaError(HttpStatus.FORBIDDEN, exception.getMessage());
         }
 
-        @ExceptionHandler(MethodArgumentNotValidException.class)
-        public ResponseEntity<GenericResponse> manejarCamposInvalidos(
-                        MethodArgumentNotValidException exception) {
-
-                String mensaje = exception.getBindingResult().getFieldErrors().stream()
-                                .min(Comparator.comparingInt(this::prioridadError))
-                                .map(error -> "Campo " + error.getField()
-                                                + ": " + error.getDefaultMessage())
-                                .orElse("Los datos enviados no son válidos");
-
-                return respuestaError(HttpStatus.BAD_REQUEST, mensaje);
-        }
-
         @ExceptionHandler(HttpMessageNotReadableException.class)
         public ResponseEntity<GenericResponse> manejarJsonInvalido(
                         HttpMessageNotReadableException exception) {
@@ -217,10 +201,5 @@ public class GlobalExceptionHandler {
                 response.setMensaje(mensaje);
 
                 return ResponseEntity.status(status).body(response);
-        }
-
-        private int prioridadError(FieldError error) {
-                return "NotBlank".equals(error.getCode()) || "NotNull".equals(error.getCode())
-                                ? 0 : 1;
         }
 }
