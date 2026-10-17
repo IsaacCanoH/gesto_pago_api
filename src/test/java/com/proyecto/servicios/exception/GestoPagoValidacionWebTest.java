@@ -9,7 +9,6 @@ import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
-import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.patch;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
@@ -47,30 +46,42 @@ class GestoPagoValidacionWebTest {
     private GestoPagoClienteConsultaService consultaService;
 
     @Test
-    void paginaNoNumerica() throws Exception {
-        mvc.perform(get("/clientes").param("pagina", "abc"))
+    void paginaNegativa() throws Exception {
+        mvc.perform(post("/clientes/buscar")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"pagina\":-1}"))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.errores.pagina").value("debe ser mayor o igual a cero"));
+    }
+
+    @Test
+    void paginaConTipoIncorrecto() throws Exception {
+        mvc.perform(post("/clientes/buscar")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"pagina\":\"abc\"}"))
                 .andExpect(status().isBadRequest())
                 .andExpect(jsonPath("$.mensaje").value(
-                        "Parámetro pagina: debe ser un número entero"));
+                        "Campo pagina: debe ser un número entero"))
+                .andExpect(jsonPath("$.errores.pagina").value("debe ser un número entero"));
     }
 
     @Test
     void fechaMalEscrita() throws Exception {
-        mvc.perform(get("/clientes/fecha-creacion")
-                        .param("desde", "2026/10/05")
-                        .param("hasta", "2026-10-05"))
+        mvc.perform(post("/clientes/buscar")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"desde\":\"2026/10/05\",\"hasta\":\"2026-10-05\"}"))
                 .andExpect(status().isBadRequest())
                 .andExpect(jsonPath("$.mensaje").value(
-                        "Parámetro desde: debe tener formato AAAA-MM-DD"));
+                        "La fecha debe tener formato AAAA-MM-DD"));
     }
 
     @Test
-    void faltaFecha() throws Exception {
-        mvc.perform(get("/clientes/fecha-creacion")
-                        .param("hasta", "2026-10-05"))
+    void identificadorInvalido() throws Exception {
+        mvc.perform(post("/clientes/buscar")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"id\":0}"))
                 .andExpect(status().isBadRequest())
-                .andExpect(jsonPath("$.mensaje").value(
-                        "Parámetro desde: es obligatorio"));
+                .andExpect(jsonPath("$.errores.id").value("debe ser mayor que cero"));
     }
 
     @Test
@@ -150,9 +161,9 @@ class GestoPagoValidacionWebTest {
 
     @Test
     void rechazaApellidoVacio() throws Exception {
-        mvc.perform(patch("/clientes/1")
+        mvc.perform(patch("/clientes")
                         .contentType(MediaType.APPLICATION_JSON)
-                        .content("{\"apellidoPaterno\":\"   \"}"))
+                        .content("{\"id\":1,\"apellidoPaterno\":\"   \"}"))
                 .andExpect(status().isBadRequest());
 
         verifyNoInteractions(clienteService);
@@ -160,12 +171,14 @@ class GestoPagoValidacionWebTest {
 
     @Test
     void rechazaCodigoPostal() throws Exception {
-        mvc.perform(patch("/clientes/1")
+        mvc.perform(patch("/clientes")
                         .contentType(MediaType.APPLICATION_JSON)
-                        .content("{\"domicilio\":{\"codigoPostal\":\"123\"}}"))
+                        .content("{\"id\":1,\"domicilio\":{\"codigoPostal\":\"123\"}}"))
                 .andExpect(status().isBadRequest())
                 .andExpect(jsonPath("$.mensaje").value(
-                        "Datos no válidos: domicilio.codigoPostal: debe tener exactamente 5 dígitos"));
+                        "Datos no válidos: domicilio.codigoPostal: debe tener exactamente 5 dígitos"))
+                .andExpect(jsonPath("$.errores['domicilio.codigoPostal']")
+                        .value("debe tener exactamente 5 dígitos"));
         verifyNoInteractions(clienteService);
     }
 
@@ -185,10 +198,12 @@ class GestoPagoValidacionWebTest {
 
     @Test
     void clienteNoEncontrado() throws Exception {
-        when(consultaService.consultarCliente(99))
+        when(consultaService.buscarClientes(any()))
                 .thenThrow(new GestoPagoClienteNoEncontradoException());
 
-        mvc.perform(get("/clientes/99"))
+        mvc.perform(post("/clientes/buscar")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"id\":99,\"detalle\":true}"))
                 .andExpect(status().isNotFound())
                 .andExpect(jsonPath("$.mensaje").value("Cliente no encontrado"));
     }
@@ -198,9 +213,9 @@ class GestoPagoValidacionWebTest {
         doThrow(new GestoPagoCorreoDuplicadoException())
                 .when(clienteService).actualizarClienteParcial(eq(7), any());
 
-        mvc.perform(patch("/clientes/7")
+        mvc.perform(patch("/clientes")
                         .contentType(MediaType.APPLICATION_JSON)
-                        .content("{\"correo\":\"ocupado@example.com\"}"))
+                        .content("{\"id\":7,\"correo\":\"ocupado@example.com\"}"))
                 .andExpect(status().isConflict());
     }
 }

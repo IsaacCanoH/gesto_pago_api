@@ -20,7 +20,7 @@ import org.springframework.web.bind.annotation.RestControllerAdvice;
 public class ValidadorCampos {
 
     @ExceptionHandler(MethodArgumentNotValidException.class)
-    public ResponseEntity<GenericResponse> validarCampos(MethodArgumentNotValidException exception) {
+    public ResponseEntity<GenericResponse<Void>> validarCampos(MethodArgumentNotValidException exception) {
         Map<String, String> errores = new LinkedHashMap<>();
         exception.getBindingResult().getFieldErrors().stream()
                 .sorted(Comparator.comparing(FieldError::getField)
@@ -32,11 +32,10 @@ public class ValidadorCampos {
                 .map(error -> error.getKey() + ": " + error.getValue())
                 .collect(Collectors.joining("; "));
 
-        GenericResponse response = new GenericResponse();
-        response.setCodigo(1);
-        response.setMensaje(detalle.isEmpty()
+        GenericResponse<Void> response = GenericResponse.error(detalle.isEmpty()
                 ? "Los datos enviados no son válidos"
                 : "Datos no válidos: " + detalle);
+        response.setErrores(errores);
         return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(response);
     }
 }

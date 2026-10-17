@@ -5,7 +5,6 @@ import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
-import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.delete;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.put;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
@@ -58,14 +57,15 @@ class GestoPagoSecurityWebTest {
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("{\"correo\":\"cliente@example.com\",\"contrasena\":\"ClaveSegura1!\"}"))
                 .andExpect(status().isOk())
-                .andExpect(jsonPath("$.token").value("token"))
-                .andExpect(jsonPath("$.expiraEn").exists())
-                .andExpect(jsonPath("$.tipo").doesNotExist());
+                .andExpect(jsonPath("$.datos.token").value("token"))
+                .andExpect(jsonPath("$.datos.expiraEn").exists())
+                .andExpect(jsonPath("$.datos.tipo").doesNotExist());
     }
 
     @Test
     void usuarioSinToken() throws Exception {
-        mvc.perform(get("/usuarios/7"))
+        mvc.perform(post("/usuarios/consultar")
+                        .contentType(MediaType.APPLICATION_JSON).content("{\"id\":7}"))
                 .andExpect(status().isUnauthorized())
                 .andExpect(jsonPath("$.codigo").value(1));
     }
@@ -79,9 +79,11 @@ class GestoPagoSecurityWebTest {
                 .thenReturn(new GestoPagoUsuarioConsultaResponse(
                         7, 3, "cliente@example.com", true, null, null));
 
-        mvc.perform(get("/usuarios/7").header("Authorization", "Bearer token-valido"))
+        mvc.perform(post("/usuarios/consultar")
+                        .header("Authorization", "Bearer token-valido")
+                        .contentType(MediaType.APPLICATION_JSON).content("{\"id\":7}"))
                 .andExpect(status().isOk())
-                .andExpect(jsonPath("$.id").value(7));
+                .andExpect(jsonPath("$.datos.id").value(7));
     }
 
     @Test
@@ -89,7 +91,9 @@ class GestoPagoSecurityWebTest {
         when(jwtService.verificar("token-malo"))
                 .thenThrow(new GestoPagoCredencialesInvalidasException());
 
-        mvc.perform(get("/usuarios/7").header("Authorization", "Bearer token-malo"))
+        mvc.perform(post("/usuarios/consultar")
+                        .header("Authorization", "Bearer token-malo")
+                        .contentType(MediaType.APPLICATION_JSON).content("{\"id\":7}"))
                 .andExpect(status().isUnauthorized())
                 .andExpect(jsonPath("$.mensaje").value("Token inválido o expirado"));
     }
@@ -100,7 +104,9 @@ class GestoPagoSecurityWebTest {
         when(authService.obtenerPrincipalActivo(7))
                 .thenThrow(new GestoPagoUsuarioInactivoException());
 
-        mvc.perform(get("/usuarios/7").header("Authorization", "Bearer token-anterior"))
+        mvc.perform(post("/usuarios/consultar")
+                        .header("Authorization", "Bearer token-anterior")
+                        .contentType(MediaType.APPLICATION_JSON).content("{\"id\":7}"))
                 .andExpect(status().isForbidden())
                 .andExpect(jsonPath("$.mensaje").value("El usuario está inactivo"));
     }
@@ -115,8 +121,29 @@ class GestoPagoSecurityWebTest {
 
     @Test
     void clienteSinToken() throws Exception {
-        mvc.perform(get("/clientes/7"))
+        mvc.perform(post("/clientes/buscar")
+                        .contentType(MediaType.APPLICATION_JSON).content("{\"id\":7}"))
                 .andExpect(status().isUnauthorized());
+    }
+
+    @Test
+    void rutaInexistenteConTokenDevuelve404() throws Exception {
+        when(jwtService.verificar("token-valido")).thenReturn(7);
+        when(authService.obtenerPrincipalActivo(7))
+                .thenReturn(new GestoPagoPrincipal(7, "cliente@example.com"));
+
+        mvc.perform(get("/ruta-inexistente")
+                        .header("Authorization", "Bearer token-valido"))
+                .andExpect(status().isNotFound())
+                .andExpect(jsonPath("$.codigo").value(1))
+                .andExpect(jsonPath("$.mensaje").value("La ruta solicitada no existe"));
+    }
+
+    @Test
+    void rutaInexistenteSinTokenConservaLaRespuestaDeSeguridad() throws Exception {
+        mvc.perform(get("/ruta-inexistente"))
+                .andExpect(status().isUnauthorized())
+                .andExpect(jsonPath("$.mensaje").value("Se requiere un token de acceso válido"));
     }
 
     @Test
@@ -125,12 +152,12 @@ class GestoPagoSecurityWebTest {
         when(authService.obtenerPrincipalActivo(7))
                 .thenReturn(new GestoPagoPrincipal(7, "cliente@example.com"));
 
-        mvc.perform(put("/usuarios/7/password")
+        mvc.perform(put("/usuarios/password")
                         .header("Authorization", "Bearer token-valido")
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("{\"contrasenaActual\":\"ClaveVieja1!\","
                                 + "\"contrasenaNueva\":\"ClaveNueva2!\"}"))
-                .andExpect(status().isNoContent());
+                .andExpect(status().isOk());
 
         verify(usuarioService).cambiarContrasena(eq(7), eq(7), any());
     }
@@ -141,16 +168,20 @@ class GestoPagoSecurityWebTest {
         when(authService.obtenerPrincipalActivo(7))
                 .thenReturn(new GestoPagoPrincipal(7, "cliente@example.com"));
 
-        mvc.perform(delete("/cuentas/00000000000000000007")
-                        .header("Authorization", "Bearer token-valido"))
-                .andExpect(status().isNoContent());
+        mvc.perform(post("/cuentas/cancelar")
+                        .header("Authorization", "Bearer token-valido")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"numeroCuenta\":\"00000000000000000007\"}"))
+                .andExpect(status().isOk());
 
         verify(cuentaService).cancelarCuenta("00000000000000000007", 7);
     }
 
     @Test
     void noCancelaCuentaSinToken() throws Exception {
-        mvc.perform(delete("/cuentas/00000000000000000007"))
+        mvc.perform(post("/cuentas/cancelar")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"numeroCuenta\":\"00000000000000000007\"}"))
                 .andExpect(status().isUnauthorized());
     }
 }
