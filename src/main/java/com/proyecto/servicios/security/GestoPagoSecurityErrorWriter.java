@@ -19,9 +19,7 @@ public class GestoPagoSecurityErrorWriter {
 
     public void escribir(HttpServletResponse response, HttpStatus status, String mensaje)
             throws IOException {
-        GenericResponse body = new GenericResponse();
-        body.setCodigo(1);
-        body.setMensaje(mensaje);
+        GenericResponse<Void> body = GenericResponse.error(mensaje);
 
         response.setStatus(status.value());
         response.setContentType(MediaType.APPLICATION_JSON_VALUE);

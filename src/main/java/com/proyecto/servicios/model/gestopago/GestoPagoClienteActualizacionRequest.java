@@ -11,6 +11,7 @@ import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.NotNull;
 import jakarta.validation.constraints.Past;
 import jakarta.validation.constraints.Pattern;
+import jakarta.validation.constraints.Positive;
 import jakarta.validation.constraints.Size;
 import lombok.Getter;
 import lombok.Setter;
@@ -18,6 +19,10 @@ import lombok.Setter;
 @Getter
 @Setter
 public class GestoPagoClienteActualizacionRequest implements TextoRecortable {
+
+    @NotNull(message = "es obligatorio")
+    @Positive(message = "debe ser mayor que cero")
+    private Integer id;
 
     @NotBlank(message = "es obligatorio")
     @Size(min = 2, max = 50, message = "debe tener entre 2 y 50 caracteres")

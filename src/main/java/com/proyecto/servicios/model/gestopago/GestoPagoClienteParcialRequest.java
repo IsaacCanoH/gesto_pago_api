@@ -1,5 +1,7 @@
 package com.proyecto.servicios.model.gestopago;
 
+import com.fasterxml.jackson.annotation.JsonSetter;
+import com.fasterxml.jackson.annotation.Nulls;
 import java.math.BigDecimal;
 import java.time.LocalDate;
 
@@ -7,15 +9,22 @@ import jakarta.validation.Valid;
 import jakarta.validation.constraints.DecimalMin;
 import jakarta.validation.constraints.Digits;
 import jakarta.validation.constraints.Email;
+import jakarta.validation.constraints.NotNull;
 import jakarta.validation.constraints.Past;
 import jakarta.validation.constraints.Pattern;
+import jakarta.validation.constraints.Positive;
 import jakarta.validation.constraints.Size;
+import lombok.AccessLevel;
 import lombok.Getter;
 import lombok.Setter;
 
 @Getter
 @Setter
 public class GestoPagoClienteParcialRequest implements TextoRecortable {
+
+    @NotNull(message = "es obligatorio")
+    @Positive(message = "debe ser mayor que cero")
+    private Integer id;
 
     @Size(min = 2, max = 50, message = "debe tener entre 2 y 50 caracteres")
     @Pattern(regexp = "^(?=.*\\p{L})[\\p{L} ]+$",
@@ -26,6 +35,10 @@ public class GestoPagoClienteParcialRequest implements TextoRecortable {
     @Pattern(regexp = "^(?=.*\\p{L})[\\p{L} ]+$",
             message = "solo admite letras y espacios, no solo espacios")
     private String segundoNombre;
+
+    @Getter(AccessLevel.NONE)
+    @Setter(AccessLevel.NONE)
+    private boolean limpiarSegundoNombre;
 
     @Size(min = 2, max = 50, message = "debe tener entre 2 y 50 caracteres")
     @Pattern(regexp = "^(?=.*\\p{L})[\\p{L} ]+$",
@@ -50,6 +63,10 @@ public class GestoPagoClienteParcialRequest implements TextoRecortable {
 
     @Pattern(regexp = "^[0-9]{10}$", message = "debe tener exactamente 10 dígitos")
     private String telefonoAlternativo;
+
+    @Getter(AccessLevel.NONE)
+    @Setter(AccessLevel.NONE)
+    private boolean limpiarTelefonoAlternativo;
 
     @Size(min = 1, max = 20, message = "debe tener entre 1 y 20 caracteres")
     @Pattern(regexp = ".*\\S.*", message = "no puede contener solo espacios")
@@ -77,6 +94,26 @@ public class GestoPagoClienteParcialRequest implements TextoRecortable {
 
     @Valid
     private GestoPagoDomicilioParcialRequest domicilio;
+
+    @JsonSetter(value = "segundoNombre", nulls = Nulls.SET)
+    public void setSegundoNombre(String segundoNombre) {
+        this.segundoNombre = segundoNombre;
+        this.limpiarSegundoNombre = segundoNombre == null;
+    }
+
+    @JsonSetter(value = "telefonoAlternativo", nulls = Nulls.SET)
+    public void setTelefonoAlternativo(String telefonoAlternativo) {
+        this.telefonoAlternativo = telefonoAlternativo;
+        this.limpiarTelefonoAlternativo = telefonoAlternativo == null;
+    }
+
+    public boolean debeLimpiarSegundoNombre() {
+        return limpiarSegundoNombre;
+    }
+
+    public boolean debeLimpiarTelefonoAlternativo() {
+        return limpiarTelefonoAlternativo;
+    }
 
     @Override
     public void recortarEspacios() {

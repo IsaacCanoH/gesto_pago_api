@@ -95,11 +95,20 @@ public class GestoPagoClienteServiceImpl implements GestoPagoClienteService {
             actualizarCorreo(obtenerUsuario(id), request.getCorreo());
         }
         if (request.getDomicilio() != null) {
-            clienteMapper.actualizarDomicilioParcial(
-                    request.getDomicilio(), obtenerDomicilio(id));
+            GestoPagoDomicilio domicilio = obtenerDomicilio(id);
+            clienteMapper.actualizarDomicilioParcial(request.getDomicilio(), domicilio);
+            if (request.getDomicilio().debeLimpiarNumeroInterior()) {
+                domicilio.setNumeroInterior(null);
+            }
         }
 
         clienteMapper.actualizarClienteParcial(request, cliente);
+        if (request.debeLimpiarSegundoNombre()) {
+            cliente.setSegundoNombre(null);
+        }
+        if (request.debeLimpiarTelefonoAlternativo()) {
+            cliente.setTelefonoAlternativo(null);
+        }
     }
 
     @Override

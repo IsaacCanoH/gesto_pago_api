@@ -1,5 +1,8 @@
 package com.proyecto.servicios.controller;
 
+import com.proyecto.servicios.model.GenericResponse;
+import com.proyecto.servicios.model.gestopago.GestoPagoCuentaBusquedaRequest;
+import com.proyecto.servicios.model.gestopago.GestoPagoCuentaCancelacionRequest;
 import com.proyecto.servicios.model.gestopago.GestoPagoCuentaConsultaResponse;
 import com.proyecto.servicios.security.GestoPagoPrincipal;
 import com.proyecto.servicios.service.GestoPagoCuentaService;
@@ -9,11 +12,11 @@ import org.springframework.data.web.PagedModel;
 import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
-import org.springframework.web.bind.annotation.DeleteMapping;
-import org.springframework.web.bind.annotation.GetMapping;
-import org.springframework.web.bind.annotation.PathVariable;
-import org.springframework.web.bind.annotation.RequestParam;
+import org.springframework.web.bind.annotation.PostMapping;
+import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RestController;
+
+import jakarta.validation.Valid;
 
 @RestController
 @RequiredArgsConstructor
@@ -21,27 +24,19 @@ public class GestoPagoCuentaController {
 
     private final GestoPagoCuentaService cuentaService;
 
-    @GetMapping(value = "/cuentas/{numeroCuenta}", produces = MediaType.APPLICATION_JSON_VALUE)
-    public ResponseEntity<GestoPagoCuentaConsultaResponse> consultarCuenta(
-            @PathVariable String numeroCuenta) {
-
-        return ResponseEntity.ok(cuentaService.consultarCuenta(numeroCuenta));
+    @PostMapping(value = "/cuentas/buscar", consumes = MediaType.APPLICATION_JSON_VALUE,
+            produces = MediaType.APPLICATION_JSON_VALUE)
+    public ResponseEntity<GenericResponse<PagedModel<GestoPagoCuentaConsultaResponse>>> buscarCuentas(
+            @Valid @RequestBody GestoPagoCuentaBusquedaRequest request) {
+        var pagina = new PagedModel<>(cuentaService.buscarCuentas(request));
+        return ResponseEntity.ok(GenericResponse.exito("Consulta de cuentas realizada", pagina));
     }
 
-    @GetMapping(value = "/cuentas/activas", produces = MediaType.APPLICATION_JSON_VALUE)
-    public ResponseEntity<PagedModel<GestoPagoCuentaConsultaResponse>> consultarCuentasActivas(
-            @RequestParam(defaultValue = "0") int pagina,
-            @RequestParam(defaultValue = "20") int tamanio) {
-
-        return ResponseEntity.ok(
-                new PagedModel<>(cuentaService.consultarCuentasActivas(pagina, tamanio)));
-    }
-
-    @DeleteMapping("/cuentas/{numeroCuenta}")
-    public ResponseEntity<Void> cancelarCuenta(
-            @PathVariable String numeroCuenta,
+    @PostMapping(value = "/cuentas/cancelar", consumes = MediaType.APPLICATION_JSON_VALUE)
+    public ResponseEntity<GenericResponse<Void>> cancelarCuenta(
+            @Valid @RequestBody GestoPagoCuentaCancelacionRequest request,
             @AuthenticationPrincipal GestoPagoPrincipal principal) {
-        cuentaService.cancelarCuenta(numeroCuenta, principal.usuarioId());
-        return ResponseEntity.noContent().build();
+        cuentaService.cancelarCuenta(request.numeroCuenta(), principal.usuarioId());
+        return ResponseEntity.ok(GenericResponse.exito("Cuenta cancelada correctamente", null));
     }
 }

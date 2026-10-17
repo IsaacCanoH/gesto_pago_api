@@ -3,11 +3,10 @@ package com.proyecto.servicios.service;
 import org.springframework.data.domain.Page;
 
 import com.proyecto.servicios.model.gestopago.GestoPagoCuentaConsultaResponse;
+import com.proyecto.servicios.model.gestopago.GestoPagoCuentaBusquedaRequest;
 
 public interface GestoPagoCuentaService {
-    GestoPagoCuentaConsultaResponse consultarCuenta(String numeroCuenta);
-
-    Page<GestoPagoCuentaConsultaResponse> consultarCuentasActivas(int pagina, int tamanio);
+    Page<GestoPagoCuentaConsultaResponse> buscarCuentas(GestoPagoCuentaBusquedaRequest request);
 
     void cancelarCuenta(String numeroCuenta, Integer usuarioId);
 } 
