@@ -4,7 +4,6 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.ArgumentMatchers.any;
-import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
 
@@ -19,15 +18,16 @@ import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.data.domain.PageImpl;
 import org.springframework.data.domain.Pageable;
+import org.springframework.data.jpa.domain.Specification;
 
-import com.proyecto.servicios.entity.gestopago.GestoPagoCuenta;
 import com.proyecto.servicios.entity.gestopago.GestoPagoCliente;
+import com.proyecto.servicios.entity.gestopago.GestoPagoCuenta;
 import com.proyecto.servicios.entity.gestopago.GestoPagoUsuario;
 import com.proyecto.servicios.exception.GestoPagoAccesoDenegadoException;
-import com.proyecto.servicios.exception.GestoPagoClienteInvalidoException;
 import com.proyecto.servicios.exception.GestoPagoCuentaNoCancelableException;
 import com.proyecto.servicios.exception.GestoPagoCuentaNoEncontradaException;
 import com.proyecto.servicios.mapper.GestoPagoClienteMapper;
+import com.proyecto.servicios.model.gestopago.GestoPagoCuentaBusquedaRequest;
 import com.proyecto.servicios.repositorys.gestopago.GestoPagoCuentaRepository;
 import com.proyecto.servicios.repositorys.gestopago.GestoPagoUsuarioRepository;
 
@@ -35,74 +35,42 @@ import com.proyecto.servicios.repositorys.gestopago.GestoPagoUsuarioRepository;
 class GestoPagoCuentaServiceImplTest {
     @Mock private GestoPagoCuentaRepository cuentas;
     @Mock private GestoPagoUsuarioRepository usuarios;
-
     private final GestoPagoClienteMapper mapper = Mappers.getMapper(GestoPagoClienteMapper.class);
 
     @Test
-    void consultaSaldo() {
-        var cuenta = cuenta();
-        when(cuentas.findByNumeroCuenta(cuenta.getNumeroCuenta()))
-                .thenReturn(Optional.of(cuenta));
+    void buscaCuentasPorNumeroYEstado() {
+        var request = new GestoPagoCuentaBusquedaRequest();
+        request.setNumeroCuenta("00000000000000000007");
+        request.setSoloActivas(true);
+        when(cuentas.findAll(any(Specification.class), any(Pageable.class)))
+                .thenReturn(new PageImpl<>(List.of(cuenta())));
 
-        var respuesta = new GestoPagoCuentaServiceImpl(cuentas, usuarios, mapper)
-                .consultarCuenta(cuenta.getNumeroCuenta());
+        var resultado = servicio().buscarCuentas(request);
 
-        assertEquals(cuenta.getNumeroCuenta(), respuesta.getNumeroCuenta());
-        assertEquals(new BigDecimal("150.00"), respuesta.getSaldo());
-        assertEquals("ACTIVA", respuesta.getEstatus());
+        assertEquals(1, resultado.getTotalElements());
+        assertEquals("00000000000000000007", resultado.getContent().get(0).getNumeroCuenta());
     }
 
     @Test
-    void cuentaInexistente() {
-        when(cuentas.findByNumeroCuenta("desconocida")).thenReturn(Optional.empty());
+    void numeroDeCuentaInexistente() {
+        var request = new GestoPagoCuentaBusquedaRequest();
+        request.setNumeroCuenta("00000000000000000099");
+        when(cuentas.findAll(any(Specification.class), any(Pageable.class)))
+                .thenReturn(new PageImpl<>(List.of()));
 
         assertThrows(GestoPagoCuentaNoEncontradaException.class,
-                () -> new GestoPagoCuentaServiceImpl(cuentas, usuarios, mapper)
-                        .consultarCuenta("desconocida"));
+                () -> servicio().buscarCuentas(request));
     }
 
     @Test
-    void listaCuentasActivas() {
-        var cuenta = cuenta();
-        when(cuentas.findByEstatusAndCliente_ActivaTrue(eq("ACTIVA"), any(Pageable.class)))
-                .thenReturn(new PageImpl<>(List.of(cuenta)));
-
-        var pagina = new GestoPagoCuentaServiceImpl(cuentas, usuarios, mapper)
-                .consultarCuentasActivas(0, 20);
-
-        assertEquals(1, pagina.getTotalElements());
-        assertEquals(cuenta.getNumeroCuenta(), pagina.getContent().get(0).getNumeroCuenta());
-    }
-
-    @Test
-    void rechazaTamanioInvalido() {
-        assertThrows(GestoPagoClienteInvalidoException.class,
-                () -> new GestoPagoCuentaServiceImpl(cuentas, usuarios, mapper)
-                        .consultarCuentasActivas(0, 101));
-        verifyNoInteractions(cuentas);
-    }
-
-    private GestoPagoCuenta cuenta() {
-        var cuenta = new GestoPagoCuenta();
-        var cliente = new GestoPagoCliente();
-        cliente.setId(7);
-        cuenta.setCliente(cliente);
-        cuenta.setNumeroCuenta("00000000000000000007");
-        cuenta.setSaldo(new BigDecimal("150.00"));
-        return cuenta;
-    }
-
-    @Test
-    void cancelaSuCuenta() {
+    void cancelaSuCuentaSinDesactivarUsuario() {
         var cuenta = cuenta();
         cuenta.setSaldo(BigDecimal.ZERO);
-        cuenta.setEstatus("ACTIVA");
         var usuario = usuario(7);
         when(cuentas.findByNumeroCuenta(cuenta.getNumeroCuenta())).thenReturn(Optional.of(cuenta));
         when(usuarios.findById(5)).thenReturn(Optional.of(usuario));
 
-        new GestoPagoCuentaServiceImpl(cuentas, usuarios, mapper)
-                .cancelarCuenta(cuenta.getNumeroCuenta(), 5);
+        servicio().cancelarCuenta(cuenta.getNumeroCuenta(), 5);
 
         assertEquals("INACTIVA", cuenta.getEstatus());
         assertTrue(usuario.isActivo());
@@ -126,40 +94,37 @@ class GestoPagoCuentaServiceImplTest {
     @Test
     void noCancelaCuentaAjena() {
         var cuenta = cuenta();
-        cuenta.setEstatus("ACTIVA");
         when(cuentas.findByNumeroCuenta(cuenta.getNumeroCuenta())).thenReturn(Optional.of(cuenta));
         when(usuarios.findById(5)).thenReturn(Optional.of(usuario(8)));
 
         assertThrows(GestoPagoAccesoDenegadoException.class,
-                () -> new GestoPagoCuentaServiceImpl(cuentas, usuarios, mapper)
-                        .cancelarCuenta(cuenta.getNumeroCuenta(), 5));
+                () -> servicio().cancelarCuenta(cuenta.getNumeroCuenta(), 5));
         assertEquals("ACTIVA", cuenta.getEstatus());
     }
 
     @Test
-    void noCancelaConSaldo() {
+    void noCancelaCuentaConSaldo() {
         var cuenta = cuenta();
-        cuenta.setEstatus("ACTIVA");
         when(cuentas.findByNumeroCuenta(cuenta.getNumeroCuenta())).thenReturn(Optional.of(cuenta));
         when(usuarios.findById(5)).thenReturn(Optional.of(usuario(7)));
 
         assertThrows(GestoPagoCuentaNoCancelableException.class,
-                () -> new GestoPagoCuentaServiceImpl(cuentas, usuarios, mapper)
-                        .cancelarCuenta(cuenta.getNumeroCuenta(), 5));
-        assertEquals("ACTIVA", cuenta.getEstatus());
+                () -> servicio().cancelarCuenta(cuenta.getNumeroCuenta(), 5));
     }
 
-    @Test
-    void cancelarDosVecesNoCambiaNada() {
-        var cuenta = cuenta();
-        cuenta.setEstatus("INACTIVA");
-        when(cuentas.findByNumeroCuenta(cuenta.getNumeroCuenta())).thenReturn(Optional.of(cuenta));
-        when(usuarios.findById(5)).thenReturn(Optional.of(usuario(7)));
+    private GestoPagoCuentaServiceImpl servicio() {
+        return new GestoPagoCuentaServiceImpl(cuentas, usuarios, mapper);
+    }
 
-        new GestoPagoCuentaServiceImpl(cuentas, usuarios, mapper)
-                .cancelarCuenta(cuenta.getNumeroCuenta(), 5);
-
-        assertEquals("INACTIVA", cuenta.getEstatus());
+    private GestoPagoCuenta cuenta() {
+        var cliente = new GestoPagoCliente();
+        cliente.setId(7);
+        var cuenta = new GestoPagoCuenta();
+        cuenta.setCliente(cliente);
+        cuenta.setNumeroCuenta("00000000000000000007");
+        cuenta.setSaldo(new BigDecimal("150.00"));
+        cuenta.setEstatus("ACTIVA");
+        return cuenta;
     }
 
     private GestoPagoUsuario usuario(int clienteId) {

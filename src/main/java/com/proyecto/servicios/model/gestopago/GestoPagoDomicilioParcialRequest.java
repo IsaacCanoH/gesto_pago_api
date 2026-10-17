@@ -1,7 +1,10 @@
 package com.proyecto.servicios.model.gestopago;
 
+import com.fasterxml.jackson.annotation.JsonSetter;
+import com.fasterxml.jackson.annotation.Nulls;
 import jakarta.validation.constraints.Pattern;
 import jakarta.validation.constraints.Size;
+import lombok.AccessLevel;
 import lombok.Getter;
 import lombok.Setter;
 
@@ -19,6 +22,10 @@ public class GestoPagoDomicilioParcialRequest implements TextoRecortable {
 
     @Size(max = 20, message = "no debe superar 20 caracteres")
     private String numeroInterior;
+
+    @Getter(AccessLevel.NONE)
+    @Setter(AccessLevel.NONE)
+    private boolean limpiarNumeroInterior;
 
     @Size(max = 100, message = "no debe superar 100 caracteres")
     @Pattern(regexp = ".*\\S.*", message = "no puede contener solo espacios")
@@ -38,6 +45,16 @@ public class GestoPagoDomicilioParcialRequest implements TextoRecortable {
     @Size(max = 60, message = "no debe superar 60 caracteres")
     @Pattern(regexp = ".*\\S.*", message = "no puede contener solo espacios")
     private String pais;
+
+    @JsonSetter(value = "numeroInterior", nulls = Nulls.SET)
+    public void setNumeroInterior(String numeroInterior) {
+        this.numeroInterior = numeroInterior;
+        this.limpiarNumeroInterior = numeroInterior == null;
+    }
+
+    public boolean debeLimpiarNumeroInterior() {
+        return limpiarNumeroInterior;
+    }
 
     @Override
     public void recortarEspacios() {

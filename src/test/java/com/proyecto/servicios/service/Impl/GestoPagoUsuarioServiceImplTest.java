@@ -75,7 +75,7 @@ class GestoPagoUsuarioServiceImplTest {
 
     @Test
     void cambiaContrasena() {
-        var request = new GestoPagoCambioContrasenaRequest("ClaveVieja1!", "ClaveNueva2!");
+        var request = new GestoPagoCambioContrasenaRequest(7, "ClaveVieja1!", "ClaveNueva2!");
         when(usuarioRepository.findById(7)).thenReturn(Optional.of(usuario));
         when(passwordEncoder.matches(request.contrasenaActual(), "hash-viejo")).thenReturn(true);
         when(passwordEncoder.encode(request.contrasenaNueva())).thenReturn("hash-nuevo");
@@ -88,7 +88,7 @@ class GestoPagoUsuarioServiceImplTest {
 
     @Test
     void cambiaContrasenaSinToken() {
-        var request = new GestoPagoCambioContrasenaRequest("ClaveVieja1!", "ClaveNueva2!");
+        var request = new GestoPagoCambioContrasenaRequest(7, "ClaveVieja1!", "ClaveNueva2!");
         when(usuarioRepository.findById(7)).thenReturn(Optional.of(usuario));
         when(passwordEncoder.matches(request.contrasenaActual(), "hash-viejo")).thenReturn(true);
         when(passwordEncoder.encode(request.contrasenaNueva())).thenReturn("hash-nuevo");
@@ -100,7 +100,7 @@ class GestoPagoUsuarioServiceImplTest {
 
     @Test
     void contrasenaActualIncorrecta() {
-        var request = new GestoPagoCambioContrasenaRequest("incorrecta", "ClaveNueva2!");
+        var request = new GestoPagoCambioContrasenaRequest(7, "incorrecta", "ClaveNueva2!");
         when(usuarioRepository.findById(7)).thenReturn(Optional.of(usuario));
 
         assertThrows(GestoPagoCredencialesInvalidasException.class,
@@ -110,7 +110,7 @@ class GestoPagoUsuarioServiceImplTest {
 
     @Test
     void contrasenaDebil() {
-        var request = new GestoPagoCambioContrasenaRequest("ClaveVieja1!", "debil");
+        var request = new GestoPagoCambioContrasenaRequest(7, "ClaveVieja1!", "debil");
         when(usuarioRepository.findById(7)).thenReturn(Optional.of(usuario));
         when(passwordEncoder.matches(request.contrasenaActual(), "hash-viejo")).thenReturn(true);
 
@@ -138,7 +138,7 @@ class GestoPagoUsuarioServiceImplTest {
 
     @Test
     void otroUsuarioNoCambiaLaContrasena() {
-        var request = new GestoPagoCambioContrasenaRequest("ClaveVieja1!", "ClaveNueva2!");
+        var request = new GestoPagoCambioContrasenaRequest(7, "ClaveVieja1!", "ClaveNueva2!");
 
         assertThrows(GestoPagoAccesoDenegadoException.class,
                 () -> service.cambiarContrasena(7, 8, request));
@@ -147,7 +147,7 @@ class GestoPagoUsuarioServiceImplTest {
 
     @Test
     void noReutilizaContrasena() {
-        var request = new GestoPagoCambioContrasenaRequest("ClaveVieja1!", "ClaveVieja1!");
+        var request = new GestoPagoCambioContrasenaRequest(7, "ClaveVieja1!", "ClaveVieja1!");
         when(usuarioRepository.findById(7)).thenReturn(Optional.of(usuario));
         when(passwordEncoder.matches(request.contrasenaActual(), "hash-viejo"))
                 .thenReturn(true);

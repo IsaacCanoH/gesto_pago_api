@@ -4,9 +4,8 @@ import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
-import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.delete;
-import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.patch;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.put;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
@@ -25,6 +24,7 @@ import org.springframework.test.web.servlet.MockMvc;
 
 import com.proyecto.servicios.model.gestopago.GestoPagoClienteConsultaResponse;
 import com.proyecto.servicios.model.gestopago.GestoPagoClienteResumenResponse;
+import com.proyecto.servicios.service.GestoPagoClienteBusquedaResultado;
 import com.proyecto.servicios.service.GestoPagoClienteConsultaService;
 import com.proyecto.servicios.service.GestoPagoClienteService;
 
@@ -37,89 +37,104 @@ class GestoPagoClienteControllerTest {
 
     @Test
     void consultaPorId() throws Exception {
-        when(consultas.consultarCliente(7)).thenReturn(respuesta());
+        when(consultas.buscarClientes(any())).thenReturn(new GestoPagoClienteBusquedaResultado(
+                new PageImpl<>(List.of(resumen())), respuesta()));
 
-        mvc.perform(get("/clientes/7"))
+        mvc.perform(post("/clientes/buscar")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"id\":7,\"detalle\":true}"))
                 .andExpect(status().isOk())
-                .andExpect(jsonPath("$.id").value(7));
+                .andExpect(jsonPath("$.datos.detalle.id").value(7));
     }
 
     @Test
     void otrasBusquedas() throws Exception {
-        when(consultas.consultarClientePorCurp("CANO050429HKNTEW00"))
-                .thenReturn(respuesta());
-        when(consultas.consultarClientePorRfc("CANO0504295G3"))
-                .thenReturn(respuesta());
-        when(consultas.consultarClientePorNumeroCuenta("00000000000000000007"))
-                .thenReturn(respuesta());
-        when(consultas.consultarClientePorCorreo("cliente@example.com"))
-                .thenReturn(respuesta());
+        when(consultas.buscarClientes(any())).thenReturn(new GestoPagoClienteBusquedaResultado(
+                new PageImpl<>(List.of(resumen())), respuesta()));
 
-        mvc.perform(get("/clientes/curp/CANO050429HKNTEW00"))
-                .andExpect(status().isOk()).andExpect(jsonPath("$.id").value(7));
-        mvc.perform(get("/clientes/rfc/CANO0504295G3"))
-                .andExpect(status().isOk()).andExpect(jsonPath("$.id").value(7));
-        mvc.perform(get("/clientes/cuenta/00000000000000000007"))
-                .andExpect(status().isOk()).andExpect(jsonPath("$.id").value(7));
-        mvc.perform(get("/clientes/correo/cliente@example.com"))
-                .andExpect(status().isOk()).andExpect(jsonPath("$.id").value(7));
+        mvc.perform(post("/clientes/buscar")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"curp\":\"CANO050429HKNTEW00\",\"detalle\":true}"))
+                .andExpect(status().isOk()).andExpect(jsonPath("$.datos.detalle.id").value(7));
+        mvc.perform(post("/clientes/buscar")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"rfc\":\"CANO0504295G3\",\"detalle\":true}"))
+                .andExpect(status().isOk()).andExpect(jsonPath("$.datos.detalle.id").value(7));
+        mvc.perform(post("/clientes/buscar")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"numeroCuenta\":\"00000000000000000007\",\"detalle\":true}"))
+                .andExpect(status().isOk()).andExpect(jsonPath("$.datos.detalle.id").value(7));
+        mvc.perform(post("/clientes/buscar")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"correo\":\"cliente@example.com\",\"detalle\":true}"))
+                .andExpect(status().isOk()).andExpect(jsonPath("$.datos.detalle.id").value(7));
     }
 
     @Test
     void listaClientes() throws Exception {
-        when(consultas.consultarClientes(0, 20))
-                .thenReturn(new PageImpl<>(List.of(resumen())));
+        when(consultas.buscarClientes(any())).thenReturn(new GestoPagoClienteBusquedaResultado(
+                new PageImpl<>(List.of(resumen())), null));
 
-        mvc.perform(get("/clientes"))
+        mvc.perform(post("/clientes/buscar")
+                        .contentType(MediaType.APPLICATION_JSON).content("{}"))
                 .andExpect(status().isOk())
-                .andExpect(jsonPath("$.content[0].id").value(7))
-                .andExpect(jsonPath("$.content[0].correo").value("cliente@example.com"))
-                .andExpect(jsonPath("$.content[0].domicilio").doesNotExist())
-                .andExpect(jsonPath("$.content[0].cuentas").doesNotExist());
+                .andExpect(jsonPath("$.datos.resultados.content[0].id").value(7))
+                .andExpect(jsonPath("$.datos.resultados.content[0].correo").value("cliente@example.com"))
+                .andExpect(jsonPath("$.datos.resultados.content[0].domicilio").doesNotExist())
+                .andExpect(jsonPath("$.datos.resultados.content[0].cuentas").doesNotExist());
     }
 
     @Test
     void filtros() throws Exception {
-        LocalDate dia = LocalDate.of(2026, 10, 5);
-        when(consultas.consultarClientesActivos(0, 20))
-                .thenReturn(new PageImpl<>(List.of(resumen())));
-        when(consultas.consultarClientesPorFechaCreacion(dia, dia, 0, 20))
-                .thenReturn(new PageImpl<>(List.of(resumen())));
+        when(consultas.buscarClientes(any())).thenReturn(new GestoPagoClienteBusquedaResultado(
+                new PageImpl<>(List.of(resumen())), null));
 
-        mvc.perform(get("/clientes/activos"))
+        mvc.perform(post("/clientes/buscar")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"activa\":true,\"desde\":\"2026-10-05\",\"hasta\":\"2026-10-05\"}"))
                 .andExpect(status().isOk())
-                .andExpect(jsonPath("$.content[0].id").value(7));
-        mvc.perform(get("/clientes/fecha-creacion")
-                        .param("desde", "2026-10-05")
-                        .param("hasta", "2026-10-05"))
+                .andExpect(jsonPath("$.datos.resultados.content[0].id").value(7));
+    }
+
+    @Test
+    void buscaPorCurpYRfc() throws Exception {
+        when(consultas.buscarClientes(any())).thenReturn(new GestoPagoClienteBusquedaResultado(
+                new PageImpl<>(List.of(resumen())), null));
+
+        mvc.perform(post("/clientes/buscar")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"curp\":\"can\",\"rfc\":\"5g3\",\"parcial\":true}"))
                 .andExpect(status().isOk())
-                .andExpect(jsonPath("$.content[0].id").value(7));
+                .andExpect(jsonPath("$.datos.resultados.content[0].id").value(7))
+                .andExpect(jsonPath("$.datos.resultados.content[0].correo").value("cliente@example.com"));
     }
 
     @Test
     void actualizaCliente() throws Exception {
-        mvc.perform(put("/clientes/7")
+        mvc.perform(put("/clientes")
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(cambioCompleto()))
-                .andExpect(status().isNoContent());
+                .andExpect(status().isOk());
 
         verify(clientes).actualizarCliente(eq(7), any());
     }
 
     @Test
     void actualizaUnCampo() throws Exception {
-        mvc.perform(patch("/clientes/7")
+        mvc.perform(patch("/clientes")
                         .contentType(MediaType.APPLICATION_JSON)
-                        .content("{\"ocupacion\":\"Analista\"}"))
-                .andExpect(status().isNoContent());
+                        .content("{\"id\":7,\"ocupacion\":\"Analista\"}"))
+                .andExpect(status().isOk());
 
         verify(clientes).actualizarClienteParcial(eq(7), any());
     }
 
     @Test
     void daDeBaja() throws Exception {
-        mvc.perform(delete("/clientes/7"))
-                .andExpect(status().isNoContent());
+        mvc.perform(post("/clientes/desactivar")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"id\":7}"))
+                .andExpect(status().isOk());
 
         verify(clientes).desactivarCliente(7);
     }
@@ -139,6 +154,7 @@ class GestoPagoClienteControllerTest {
     private String cambioCompleto() {
         return """
                 {
+                  "id": 7,
                   "nombre": "Maria",
                   "apellidoPaterno": "Lopez",
                   "apellidoMaterno": "Perez",
