@@ -8,6 +8,7 @@ import org.springframework.web.bind.annotation.RestController;
 
 import com.proyecto.servicios.model.gestopago.GestoPagoLoginRequest;
 import com.proyecto.servicios.model.gestopago.GestoPagoLoginResponse;
+import com.proyecto.servicios.model.GenericResponse;
 import com.proyecto.servicios.service.GestoPagoAuthService;
 
 import jakarta.validation.Valid;
@@ -20,8 +21,9 @@ public class GestoPagoAuthController {
 
     @PostMapping(value = "/auth/login", consumes = MediaType.APPLICATION_JSON_VALUE,
             produces = MediaType.APPLICATION_JSON_VALUE)
-    public ResponseEntity<GestoPagoLoginResponse> iniciarSesion(
+    public ResponseEntity<GenericResponse<GestoPagoLoginResponse>> iniciarSesion(
             @Valid @RequestBody GestoPagoLoginRequest request) {
-        return ResponseEntity.ok(authService.iniciarSesion(request));
+        return ResponseEntity.ok(GenericResponse.exito("Inicio de sesión correcto",
+                authService.iniciarSesion(request)));
     }
 }

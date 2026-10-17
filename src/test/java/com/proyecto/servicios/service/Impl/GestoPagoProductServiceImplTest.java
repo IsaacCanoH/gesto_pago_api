@@ -11,6 +11,7 @@ import com.proyecto.servicios.exception.GestoPagoExternalResponseException;
 import com.proyecto.servicios.exception.GestoPagoAuthenticationException;
 import com.proyecto.servicios.exception.GestoPagoCommunicationException;
 import com.proyecto.servicios.model.gestopago.GestoPagoProductoResponse;
+import com.proyecto.servicios.model.gestopago.GestoPagoProductoPaginaRequest;
 
 import feign.Request;
 import feign.RetryableException;
@@ -20,6 +21,9 @@ import java.util.Collections;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
+import org.springframework.data.domain.PageImpl;
+import org.springframework.data.domain.PageRequest;
+import org.springframework.data.domain.Pageable;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
@@ -37,6 +41,10 @@ import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.mockito.Mockito.verifyNoInteractions;
+import static org.mockito.Mockito.times;
+import static org.mockito.Mockito.doReturn;
+import static org.mockito.Mockito.spy;
+import org.mockito.ArgumentCaptor;
 
 @ExtendWith(MockitoExtension.class)
 class GestoPagoProductServiceImplTest {
@@ -329,5 +337,64 @@ class GestoPagoProductServiceImplTest {
         orden.verify(productoCache).invalidar();
         orden.verify(productoRepository).findAll();
         orden.verify(productoCache).guardarTodos(catalogo);
+    }
+
+    @Test
+    void paginaProductosDesdePostgresSinCargarTodoElCatalogo() {
+        GestoPagoProducto entidad = new GestoPagoProducto();
+        entidad.setIdProducto(14302L);
+        GestoPagoProductoResponse respuesta = new GestoPagoProductoResponse();
+        respuesta.setIdProducto(14302L);
+        GestoPagoProductoPaginaRequest request = new GestoPagoProductoPaginaRequest();
+        request.setPagina(1);
+        request.setTamanio(2);
+
+        when(productoRepository.findAll(any(Pageable.class)))
+                .thenReturn(new PageImpl<>(List.of(entidad), PageRequest.of(1, 2), 3));
+        when(productoMapper.toResponse(entidad)).thenReturn(respuesta);
+
+        var pagina = gestoPagoProductService.consultarProductosPaginados(request);
+
+        assertEquals(3, pagina.getTotalElements());
+        assertEquals(14302L, pagina.getContent().get(0).getIdProducto());
+        ArgumentCaptor<Pageable> paginacion = ArgumentCaptor.forClass(Pageable.class);
+        verify(productoRepository).findAll(paginacion.capture());
+        assertEquals(1, paginacion.getValue().getPageNumber());
+        assertEquals(2, paginacion.getValue().getPageSize());
+        assertEquals("idProducto", paginacion.getValue().getSort().iterator().next().getProperty());
+        verifyNoInteractions(productoCache, gestoPagoProductClient, gestoPagoTokenService);
+    }
+
+    @Test
+    void paginaVaciaFueraDelRangoNoSincronizaSiExistenProductos() {
+        GestoPagoProductoPaginaRequest request = new GestoPagoProductoPaginaRequest();
+        request.setPagina(2);
+        request.setTamanio(2);
+        when(productoRepository.findAll(any(Pageable.class)))
+                .thenReturn(new PageImpl<>(List.of(), PageRequest.of(2, 2), 3));
+
+        var pagina = gestoPagoProductService.consultarProductosPaginados(request);
+
+        assertEquals(0, pagina.getNumberOfElements());
+        verify(productoRepository, times(1)).findAll(any(Pageable.class));
+        verifyNoInteractions(gestoPagoProductClient, gestoPagoTokenService);
+    }
+
+    @Test
+    void sincronizaSoloSiElCatalogoPaginadoEstaVacio() {
+        GestoPagoProducto entidad = new GestoPagoProducto();
+        entidad.setIdProducto(14302L);
+        GestoPagoProductoPaginaRequest request = new GestoPagoProductoPaginaRequest();
+        when(productoRepository.findAll(any(Pageable.class)))
+                .thenReturn(new PageImpl<>(List.of()))
+                .thenReturn(new PageImpl<>(List.of(entidad)));
+        var servicio = spy(gestoPagoProductService);
+        doReturn(1).when(servicio).sincronizarProductos();
+
+        var pagina = servicio.consultarProductosPaginados(request);
+
+        assertEquals(1, pagina.getTotalElements());
+        verify(servicio).sincronizarProductos();
+        verify(productoRepository, times(2)).findAll(any(Pageable.class));
     }
 }
