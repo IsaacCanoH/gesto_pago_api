@@ -64,6 +64,10 @@ public class GestoPagoClienteRegistroRequest implements TextoRecortable {
     private String contrasena;
 
     @NotBlank(message = "es obligatorio")
+    @Pattern(regexp = "^[0-9]{6}$", message = "debe tener exactamente 6 dígitos")
+    private String pin;
+
+    @NotBlank(message = "es obligatorio")
     @Pattern(regexp = "^[0-9]{10}$", message = "debe tener exactamente 10 dígitos")
     private String telefonoMovil;
 

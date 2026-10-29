@@ -30,13 +30,9 @@ public class GestoPagoJwtFilter extends OncePerRequestFilter {
 
     @Override
     protected boolean shouldNotFilter(HttpServletRequest request) {
-        String path = request.getServletPath();
-        return HttpMethod.OPTIONS.matches(request.getMethod())
-                || (HttpMethod.POST.matches(request.getMethod())
-                        && ("/auth/login".equals(path) || "/clientes".equals(path)))
-                || path.startsWith("/v3/api-docs/") || "/v3/api-docs".equals(path)
-                || path.startsWith("/swagger-ui/") || "/swagger-ui.html".equals(path)
-                || "/actuator/health".equals(path) || "/error".equals(path);
+        String path = request.getRequestURI().substring(request.getContextPath().length());
+        return !HttpMethod.POST.matches(request.getMethod())
+                || !("/pagos".equals(path) || "/pagos/consultar".equals(path));
     }
 
     @Override

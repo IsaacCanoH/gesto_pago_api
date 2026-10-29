@@ -1,0 +1,42 @@
+gestopago:
+  base-url: ${GESTOPAGO_BASE_URL:https://gestopago.portalventas.net}
+  auth:
+    endpoint: /sistema/app/jwt-gp/authenticate/
+    id-distribuidor: ${GESTOPAGO_AUTH_ID_DISTRIBUIDOR:}
+    codigo-dispositivo: ${GESTOPAGO_AUTH_CODIGO_DISPOSITIVO:}
+    password: ${GESTOPAGO_AUTH_PASSWORD:}
+  product:
+    endpoint: /sistema/service/getProductList.do
+    sync-cron: "0 0 12 * * *"
+    time-zone: America/Mexico_City
+    cache-ttl: ${GESTOPAGO_PRODUCT_CACHE_TTL:10m}
+  jwt:
+    secret: ${GESTOPAGO_JWT_SECRET:}
+    expiration-minutes: ${GESTOPAGO_JWT_EXPIRATION_MINUTES:60}
+  pago:
+    endpoint: /sistema/service/sendTx.do
+    confirm-endpoint: /sistema/service/confirmTx.do
+    unidad: ${GESTOPAGO_PAGO_UNIDAD:083}
+    secret-key: ${GESTOPAGO_PAGO_SECRET_KEY:}
+    iv: ${GESTOPAGO_PAGO_IV:}
+    api-key: ${GESTOPAGO_PAGO_API_KEY:}
+
+spring:
+  cloud:
+    config:
+      enabled: false
+    openfeign:
+      client:
+        config:
+          gestoPagoAuth:
+            connectTimeout: 2000
+            readTimeout: 5000
+            loggerLevel: NONE
+          gestoPagoProduct:
+            connectTimeout: 2000
+            readTimeout: 10000
+            loggerLevel: NONE
+          gestoPagoTx:
+            connectTimeout: 2000
+            readTimeout: 65000
+            loggerLevel: NONE

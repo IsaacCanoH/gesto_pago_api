@@ -2,6 +2,9 @@ package com.proyecto.servicios.entity.gestopago;
 
 import java.time.LocalDate;
 import java.time.ZoneId;
+import java.time.Instant;
+
+import com.fasterxml.jackson.annotation.JsonIgnore;
 
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
@@ -37,6 +40,18 @@ public class GestoPagoUsuario {
 
     @Column(name = "password_hash", nullable = false, length = 255)
     private String passwordHash;
+
+    @Column(name = "pin_hash", length = 255)
+    @JsonIgnore
+    private String pinHash;
+
+    @Column(name = "pin_intentos_fallidos", nullable = false)
+    @JsonIgnore
+    private int pinIntentosFallidos;
+
+    @Column(name = "pin_bloqueado_hasta")
+    @JsonIgnore
+    private Instant pinBloqueadoHasta;
 
     @Column(name = "activo", nullable = false)
     private boolean activo = true;

@@ -39,6 +39,9 @@ public class GestoPagoCuenta {
     @Column(name = "saldo", nullable = false, precision = 15, scale = 2)
     private BigDecimal saldo;
 
+    @Column(name = "saldo_retenido", nullable = false, precision = 15, scale = 2)
+    private BigDecimal saldoRetenido = BigDecimal.ZERO;
+
     @Column(name = "estatus", nullable = false, length = 10)
     private String estatus = "ACTIVA";
 
@@ -47,6 +50,10 @@ public class GestoPagoCuenta {
 
     @Column(name = "fecha_actualizacion", nullable = false)
     private LocalDate fechaActualizacion;
+
+    public BigDecimal getSaldoDisponible() {
+        return saldo.subtract(saldoRetenido);
+    }
 
     @PrePersist
     void alCrear() {

@@ -16,6 +16,7 @@ import org.springframework.http.converter.HttpMessageNotReadableException;
 import org.springframework.web.HttpRequestMethodNotSupportedException;
 import org.springframework.web.servlet.NoHandlerFoundException;
 import org.springframework.web.servlet.resource.NoResourceFoundException;
+import org.springframework.web.bind.MissingRequestHeaderException;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
 
@@ -155,6 +156,12 @@ public class GlobalExceptionHandler {
                                 "El JSON es inválido o contiene un dato con formato incorrecto");
         }
 
+        @ExceptionHandler(MissingRequestHeaderException.class)
+        public ResponseEntity<GenericResponse<Void>> manejarEncabezadoFaltante(
+                        MissingRequestHeaderException exception) {
+                return respuestaError(HttpStatus.BAD_REQUEST,
+                                "Encabezado " + exception.getHeaderName() + ": es obligatorio");
+        }
         @ExceptionHandler(DataIntegrityViolationException.class)
         public ResponseEntity<GenericResponse<Void>> manejarRestriccionDeDatos(
                         DataIntegrityViolationException exception) {
@@ -202,11 +209,59 @@ public class GlobalExceptionHandler {
                                 "El método HTTP no está permitido para esta ruta");
         }
 
+        @ExceptionHandler(GestoPagoPagoInvalidoException.class)
+        public ResponseEntity<GenericResponse<Void>> manejarPagoInvalido(
+                        GestoPagoPagoInvalidoException exception) {
+                return respuestaError(HttpStatus.BAD_REQUEST, exception.getMessage());
+        }
+
+        @ExceptionHandler({GestoPagoCuentaInactivaException.class, GestoPagoSaldoInsuficienteException.class})
+        public ResponseEntity<GenericResponse<Void>> manejarPagoNoDisponible(RuntimeException exception) {
+                return respuestaError(HttpStatus.CONFLICT, exception.getMessage());
+        }
+
+        @ExceptionHandler(GestoPagoPagoIndeterminadoException.class)
+        public ResponseEntity<GenericResponse<Void>> manejarPagoIndeterminado(
+                        GestoPagoPagoIndeterminadoException exception) {
+                log.warn("El resultado del pago requiere confirmación: {}",
+                                exception.getCause() == null ? "respuesta desconocida"
+                                                : exception.getCause().getClass().getSimpleName());
+                return respuestaError(HttpStatus.BAD_GATEWAY, exception.getMessage());
+        }
+
+        @ExceptionHandler(GestoPagoPagoNoEncontradoException.class)
+        public ResponseEntity<GenericResponse<Void>> manejarPagoNoEncontrado(
+                        GestoPagoPagoNoEncontradoException exception) {
+                return respuestaError(HttpStatus.NOT_FOUND, exception.getMessage());
+        }
+
+        @ExceptionHandler(GestoPagoSolicitudDuplicadaException.class)
+        public ResponseEntity<GenericResponse<Void>> manejarSolicitudDuplicada(
+                        GestoPagoSolicitudDuplicadaException exception) {
+                return respuestaError(HttpStatus.CONFLICT, exception.getMessage());
+        }
+
+        @ExceptionHandler(GestoPagoPinInvalidoException.class)
+        public ResponseEntity<GenericResponse<Void>> manejarPinInvalido(GestoPagoPinInvalidoException exception) {
+                return respuestaError(HttpStatus.FORBIDDEN, exception.getMessage());
+        }
+
+        @ExceptionHandler(GestoPagoPinBloqueadoException.class)
+        public ResponseEntity<GenericResponse<Void>> manejarPinBloqueado(GestoPagoPinBloqueadoException exception) {
+                return respuestaError(HttpStatus.TOO_MANY_REQUESTS, exception.getMessage());
+        }
+
+        @ExceptionHandler(GestoPagoPinNoConfiguradoException.class)
+        public ResponseEntity<GenericResponse<Void>> manejarPinNoConfigurado(GestoPagoPinNoConfiguradoException exception) {
+                return respuestaError(HttpStatus.CONFLICT, exception.getMessage());
+        }
+
         @ExceptionHandler(Exception.class)
         public ResponseEntity<GenericResponse<Void>> manejarErrorNoControlado(
                         Exception exception) {
 
-                log.error("Error no controlado al procesar la solicitud", exception);
+                log.error("Error no controlado al procesar la solicitud; tipo={}",
+                                exception.getClass().getSimpleName());
 
                 return respuestaError(
                                 HttpStatus.INTERNAL_SERVER_ERROR,

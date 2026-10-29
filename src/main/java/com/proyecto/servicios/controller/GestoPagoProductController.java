@@ -7,6 +7,7 @@ import com.proyecto.servicios.model.gestopago.GestoPagoProductoPaginaRequest;
 import com.proyecto.servicios.model.gestopago.GestoPagoSincronizacionResponse;
 import jakarta.validation.Valid;
 import org.springframework.data.web.PagedModel;
+import lombok.RequiredArgsConstructor;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import java.util.List;
@@ -16,14 +17,10 @@ import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RestController;
 
 @RestController
+@RequiredArgsConstructor
 public class GestoPagoProductController {
 
     private final GestoPagoProductService gestoPagoProductService;
-
-    public GestoPagoProductController(
-            GestoPagoProductService gestoPagoProductService) {
-        this.gestoPagoProductService = gestoPagoProductService;
-    }
 
     @PostMapping(value = "/gestopago/productos/sincronizar", produces = MediaType.APPLICATION_JSON_VALUE)
     public ResponseEntity<GenericResponse<GestoPagoSincronizacionResponse>> sincronizarProductos() {

@@ -1,6 +1,10 @@
 package com.proyecto.servicios.security;
 
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertNotNull;
+import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
@@ -12,6 +16,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 import java.time.Instant;
 
 import org.junit.jupiter.api.Test;
+import org.mockito.ArgumentCaptor;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.autoconfigure.web.servlet.WebMvcTest;
 import org.springframework.boot.test.mock.mockito.MockBean;
@@ -24,20 +29,28 @@ import com.proyecto.servicios.config.GestoPagoSecurityConfig;
 import com.proyecto.servicios.controller.GestoPagoAuthController;
 import com.proyecto.servicios.controller.GestoPagoClienteController;
 import com.proyecto.servicios.controller.GestoPagoCuentaController;
+import com.proyecto.servicios.controller.GestoPagoPagoController;
 import com.proyecto.servicios.controller.GestoPagoUsuarioController;
 import com.proyecto.servicios.model.gestopago.GestoPagoLoginRequest;
 import com.proyecto.servicios.model.gestopago.GestoPagoLoginResponse;
 import com.proyecto.servicios.model.gestopago.GestoPagoUsuarioConsultaResponse;
+import com.proyecto.servicios.model.gestopago.GestoPagoPagoConsultaResponse;
+import com.proyecto.servicios.entity.gestopago.GestoPagoEstadoPago;
 import com.proyecto.servicios.service.GestoPagoAuthService;
 import com.proyecto.servicios.service.GestoPagoClienteBusquedaResultado;
 import com.proyecto.servicios.service.GestoPagoClienteConsultaService;
 import com.proyecto.servicios.service.GestoPagoClienteService;
 import com.proyecto.servicios.service.GestoPagoCuentaService;
+import com.proyecto.servicios.service.GestoPagoEstadoPagoService;
+import com.proyecto.servicios.service.GestoPagoPagoWorkflowService;
+import com.proyecto.servicios.model.gestopago.GestoPagoReservaPagoCommand;
 import com.proyecto.servicios.service.GestoPagoUsuarioService;
+import com.proyecto.servicios.service.GestoPagoPinService;
 
 @WebMvcTest(controllers = {GestoPagoAuthController.class, GestoPagoUsuarioController.class,
-        GestoPagoClienteController.class, GestoPagoCuentaController.class})
-@Import(GestoPagoSecurityConfig.class)
+        GestoPagoClienteController.class, GestoPagoCuentaController.class,
+        GestoPagoPagoController.class})
+@Import({GestoPagoSecurityConfig.class, GestoPagoSecurityErrorWriter.class})
 class GestoPagoSecurityWebTest {
     @Autowired private MockMvc mvc;
     @MockBean private GestoPagoAuthService authService;
@@ -45,6 +58,9 @@ class GestoPagoSecurityWebTest {
     @MockBean private GestoPagoClienteService clienteService;
     @MockBean private GestoPagoClienteConsultaService consultaService;
     @MockBean private GestoPagoCuentaService cuentaService;
+    @MockBean private GestoPagoEstadoPagoService estadoPagoService;
+    @MockBean private GestoPagoPagoWorkflowService pagoWorkflowService;
+    @MockBean private GestoPagoJwtService jwtService;
 
     @Test
     void loginSigueDisponible() throws Exception {
@@ -106,6 +122,40 @@ class GestoPagoSecurityWebTest {
         mvc.perform(get("/ruta-inexistente"))
                 .andExpect(status().isNotFound())
                 .andExpect(jsonPath("$.mensaje").value("La ruta solicitada no existe"));
+    }
+
+    @Test
+    void consultarPagoExigeTokenYUsaUsuarioAutenticado() throws Exception {
+        String cuerpo = "{\"upc\":\"P12345678901234\"}";
+        mvc.perform(post("/pagos/consultar")
+                        .contentType(MediaType.APPLICATION_JSON).content(cuerpo))
+                .andExpect(status().isUnauthorized());
+
+        when(jwtService.verificar("token-valido")).thenReturn(7);
+        when(authService.obtenerPrincipalActivo(7))
+                .thenReturn(new GestoPagoPrincipal(7, "cliente@example.com"));
+        when(estadoPagoService.consultar("P12345678901234", 7))
+                .thenReturn(new GestoPagoPagoConsultaResponse(
+                        "P12345678901234", "00000000000000000007", 205L,
+                        java.math.BigDecimal.TEN, GestoPagoEstadoPago.PENDIENTE,
+                        false, Instant.now(), null, null, null));
+
+        var resultado = mvc.perform(post("/pagos/consultar")
+                        .header("Authorization", "Bearer token-valido")
+                        .contentType(MediaType.APPLICATION_JSON).content(cuerpo));
+        verify(jwtService).verificar("token-valido");
+        resultado.andExpect(status().isOk())
+                .andExpect(jsonPath("$.estatus").value("PENDIENTE"));
+        verify(estadoPagoService).consultar("P12345678901234", 7);
+    }
+
+    @Test
+    void iniciarPagoExigeToken() throws Exception {
+        mvc.perform(post("/pagos")
+                        .header("Idempotency-Key", "e5c1b457-3e9e-4b48-9d7c-aaa501c5e271")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"numeroCuenta\":\"00000000000000000007\"}"))
+                .andExpect(status().isUnauthorized());
     }
 
     @Test
