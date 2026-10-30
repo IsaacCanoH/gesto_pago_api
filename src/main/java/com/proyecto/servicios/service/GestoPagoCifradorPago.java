@@ -15,9 +15,11 @@ import com.proyecto.servicios.config.GestoPagoCifradoProperties;
 import com.proyecto.servicios.model.gestopago.GestoPagoSendTxRequest;
 
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 
 @Component
 @RequiredArgsConstructor
+@Slf4j
 public class GestoPagoCifradorPago {
     private final ObjectMapper objectMapper;
     private final GestoPagoCifradoProperties properties;
@@ -32,14 +34,17 @@ public class GestoPagoCifradorPago {
             byte[] json = objectMapper.writeValueAsBytes(request);
             return Base64.getEncoder().encodeToString(cipher.doFinal(json));
         } catch (JsonProcessingException e) {
+            log.error("No se pudo preparar el JSON del pago; tipo={}", e.getClass().getSimpleName());
             throw new IllegalStateException("No fue posible preparar la solicitud del pago", e);
         } catch (GeneralSecurityException e) {
+            log.error("No se pudo cifrar la solicitud del pago; tipo={}", e.getClass().getSimpleName());
             throw new IllegalStateException("No fue posible cifrar la solicitud del pago", e);
         }
     }
 
     private byte[] decodificar(String valor, int longitud, String nombre) {
         if (valor == null || valor.isBlank()) {
+            log.error("Configuración de cifrado ausente: {}", nombre);
             throw new IllegalStateException(nombre + " no está configurada");
         }
         try {
@@ -49,6 +54,7 @@ public class GestoPagoCifradorPago {
             }
             return bytes;
         } catch (IllegalArgumentException e) {
+            log.error("Configuración de cifrado inválida: {} debe decodificar a {} bytes", nombre, longitud);
             throw new IllegalStateException(nombre + " debe estar en Base64 y tener " + longitud + " bytes", e);
         }
     }

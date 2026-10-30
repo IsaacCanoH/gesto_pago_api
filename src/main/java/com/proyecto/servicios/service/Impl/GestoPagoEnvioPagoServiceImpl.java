@@ -85,6 +85,8 @@ public class GestoPagoEnvioPagoServiceImpl implements GestoPagoEnvioPagoService 
         try {
             return llamarProveedor(token, pago, operacion);
         } catch (FeignException e) {
+            log.warn("Fallo de comunicación con PuntoRed operación={} UPC={} HTTP={} tipo={}",
+                    operacion, pago.getUpc(), e.status(), e.getClass().getSimpleName());
             if (operacion == Operacion.ENVIAR || (e.status() != 401 && e.status() != 403)) {
                 throw new GestoPagoPagoIndeterminadoException(e);
             }
@@ -92,6 +94,8 @@ public class GestoPagoEnvioPagoServiceImpl implements GestoPagoEnvioPagoService 
             try {
                 return llamarProveedor(tokenService.renovarTokenAhora(), pago, operacion);
             } catch (FeignException segundoIntento) {
+                log.warn("Fallo tras renovar token de confirmTx UPC={} HTTP={} tipo={}",
+                        pago.getUpc(), segundoIntento.status(), segundoIntento.getClass().getSimpleName());
                 throw new GestoPagoPagoIndeterminadoException(segundoIntento);
             }
         }

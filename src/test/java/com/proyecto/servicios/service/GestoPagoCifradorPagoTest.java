@@ -3,6 +3,7 @@ package com.proyecto.servicios.service;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertThrows;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import java.math.BigDecimal;
 import java.nio.charset.StandardCharsets;
@@ -13,6 +14,9 @@ import javax.crypto.spec.IvParameterSpec;
 import javax.crypto.spec.SecretKeySpec;
 
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.extension.ExtendWith;
+import org.springframework.boot.test.system.CapturedOutput;
+import org.springframework.boot.test.system.OutputCaptureExtension;
 
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
@@ -20,6 +24,7 @@ import com.proyecto.servicios.config.GestoPagoCifradoProperties;
 import com.proyecto.servicios.entity.gestopago.GestoPagoPago;
 import com.proyecto.servicios.model.gestopago.GestoPagoSendTxRequest;
 
+@ExtendWith(OutputCaptureExtension.class)
 class GestoPagoCifradorPagoTest {
     private static final String LLAVE = "HPo7OLqB4Fkk4E2yGOtwqw8H5fHR9kNx67OR4g4UdlA=";
     private static final String IV = "p5ldmBPdd/9pjC0bDC/nSg==";
@@ -48,7 +53,7 @@ class GestoPagoCifradorPagoTest {
     }
 
     @Test
-    void rechazaLlaveNoConfigurada() {
+    void rechazaLlaveNoConfigurada(CapturedOutput output) {
         GestoPagoCifradorPago cifrador = new GestoPagoCifradorPago(
                 mapper, propiedades("", IV));
 
@@ -56,6 +61,21 @@ class GestoPagoCifradorPagoTest {
                 () -> cifrador.cifrar(new GestoPagoSendTxRequest(
                         1L, 2L, "1111111111", "20261020120000", null,
                         null, "P123", "083")));
+        assertTrue(output.getOut().contains("Configuración de cifrado ausente: GESTOPAGO_PAGO_SECRET_KEY"));
+    }
+
+    @Test
+    void registraVariableInvalidaSinImprimirSuValor(CapturedOutput output) {
+        String valorPrivado = "valor-privado-invalido";
+        GestoPagoCifradorPago cifrador = new GestoPagoCifradorPago(
+                mapper, propiedades(valorPrivado, IV));
+
+        assertThrows(IllegalStateException.class,
+                () -> cifrador.cifrar(new GestoPagoSendTxRequest(
+                        1L, 2L, "1111111111", "20261020120000", null,
+                        null, "P123", "083")));
+        assertTrue(output.getOut().contains("Configuración de cifrado inválida: GESTOPAGO_PAGO_SECRET_KEY"));
+        assertFalse(output.getOut().contains(valorPrivado));
     }
 
     @Test

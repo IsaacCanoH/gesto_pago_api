@@ -29,6 +29,8 @@ public class GestoPagoPagoWorkflowServiceImpl implements GestoPagoPagoWorkflowSe
         pinService.validar(usuarioId, pin);
         var existente = estadoService.buscarSolicitud(command.solicitudId(), command, usuarioId);
         if (existente.isPresent()) {
+            log.info("Solicitud de pago repetida UPC={} estado={}",
+                    existente.get().upc(), existente.get().estatus());
             return existente.get();
         }
         GestoPagoPago reservado;
@@ -43,6 +45,8 @@ public class GestoPagoPagoWorkflowServiceImpl implements GestoPagoPagoWorkflowSe
             pago = estadoService.iniciarEnvio(
                     reservado.getId(), proveedorService.preparar(reservado));
         } catch (RuntimeException e) {
+            log.error("Pago UPC={} detenido antes de sendTx; tipo={}",
+                    reservado.getUpc(), e.getClass().getSimpleName());
             estadoService.cancelarSinEnvio(reservado.getId());
             throw e;
         }
