@@ -13,6 +13,7 @@ import jakarta.validation.constraints.Pattern;
 import jakarta.validation.constraints.Size;
 
 public record GestoPagoPagoRequest(
+        @NotNull UUID solicitudId,
         @NotBlank @Size(min = 20, max = 20) String numeroCuenta,
         @NotNull @Positive Long idServicio,
         @NotNull @Positive Long idProducto,
@@ -27,7 +28,7 @@ public record GestoPagoPagoRequest(
         return "GestoPagoPagoRequest[protegido]";
     }
 
-    public GestoPagoReservaPagoCommand aComando(UUID solicitudId) {
+    public GestoPagoReservaPagoCommand aComando() {
         boolean pagoTelefonico = Integer.valueOf(1).equals(tipoFront);
         return new GestoPagoReservaPagoCommand(
                 numeroCuenta, idServicio, idProducto, tipoFront, montoPago,
