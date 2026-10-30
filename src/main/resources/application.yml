@@ -17,8 +17,8 @@ gestopago:
     endpoint: /sistema/service/sendTx.do
     confirm-endpoint: /sistema/service/confirmTx.do
     unidad: ${GESTOPAGO_PAGO_UNIDAD:083}
-    secret-key: ${GESTOPAGO_PAGO_SECRET_KEY:}
-    iv: ${GESTOPAGO_PAGO_IV:}
+    secret-key: HPo7OLqB4Fkk4E2yGOtwqw8H5fHR9kNx67OR4g4UdlA=
+    iv: p5ldmBPdd/9pjC0bDC/nSg==
     api-key: ${GESTOPAGO_PAGO_API_KEY:}
 
 spring:
