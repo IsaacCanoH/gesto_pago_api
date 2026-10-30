@@ -1,226 +1,281 @@
 package com.proyecto.servicios.exception;
 
 import java.time.LocalDate;
-import java.util.Comparator;
+import java.util.Map;
+import java.util.stream.Collectors;
 
+import com.fasterxml.jackson.databind.JsonMappingException;
 import com.fasterxml.jackson.databind.exc.InvalidFormatException;
 import com.proyecto.servicios.model.GenericResponse;
-import lombok.extern.slf4j.Slf4j;
 
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.http.converter.HttpMessageNotReadableException;
-import org.springframework.validation.FieldError;
+import org.springframework.web.HttpRequestMethodNotSupportedException;
+import org.springframework.web.bind.MissingRequestHeaderException;
 import org.springframework.web.bind.MissingServletRequestParameterException;
-import org.springframework.web.bind.MethodArgumentNotValidException;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
 import org.springframework.web.method.annotation.MethodArgumentTypeMismatchException;
+import org.springframework.web.servlet.NoHandlerFoundException;
+import org.springframework.web.servlet.resource.NoResourceFoundException;
 
 @RestControllerAdvice
 @Slf4j
 public class GlobalExceptionHandler {
 
-        @ExceptionHandler(GestoPagoAuthenticationException.class)
-        public ResponseEntity<GenericResponse> manejarAutenticacion(
-                        GestoPagoAuthenticationException exception) {
+    @ExceptionHandler(GestoPagoAuthenticationException.class)
+    public ResponseEntity<GenericResponse<Void>> manejarAutenticacion(
+            GestoPagoAuthenticationException exception) {
+        log.error("Error de autenticación con GestoPago: {}", exception.getMessage());
+        return respuestaError(HttpStatus.UNAUTHORIZED,
+                "No fue posible autenticar la solicitud con GestoPago");
+    }
 
-                log.error("Error de autenticación con GestoPago: {}",
-                                exception.getMessage());
+    @ExceptionHandler(GestoPagoCommunicationException.class)
+    public ResponseEntity<GenericResponse<Void>> manejarComunicacion(
+            GestoPagoCommunicationException exception) {
+        log.error("Error de comunicación con GestoPago: {}", exception.getMessage());
+        return respuestaError(HttpStatus.BAD_GATEWAY,
+                "No fue posible comunicarse con GestoPago");
+    }
 
-                return respuestaError(
-                                HttpStatus.UNAUTHORIZED,
-                                "No fue posible autenticar la solicitud con GestoPago");
-        }
+    @ExceptionHandler(GestoPagoExternalResponseException.class)
+    public ResponseEntity<GenericResponse<Void>> manejarRespuestaExterna(
+            GestoPagoExternalResponseException exception) {
+        log.error("Respuesta no exitosa de GestoPago: {}", exception.getMessage());
+        return respuestaError(HttpStatus.BAD_GATEWAY,
+                "GestoPago respondió con un error");
+    }
 
-        @ExceptionHandler(GestoPagoCommunicationException.class)
-        public ResponseEntity<GenericResponse> manejarComunicacion(
-                        GestoPagoCommunicationException exception) {
+    @ExceptionHandler(GestoPagoSynchronizationInProgressException.class)
+    public ResponseEntity<GenericResponse<Void>> manejarSincronizacionEnProceso(
+            GestoPagoSynchronizationInProgressException exception) {
+        log.warn("Sincronización de productos rechazada: {}", exception.getMessage());
+        return respuestaError(HttpStatus.TOO_MANY_REQUESTS,
+                "Ya existe una sincronización de productos en curso");
+    }
 
-                log.error("Error de comunicación con GestoPago: {}",
-                                exception.getMessage());
+    @ExceptionHandler(GestoPagoClienteInvalidoException.class)
+    public ResponseEntity<GenericResponse<Void>> manejarClienteInvalido(
+            GestoPagoClienteInvalidoException exception) {
+        return respuestaError(HttpStatus.BAD_REQUEST, exception.getMessage());
+    }
 
-                return respuestaError(
-                                HttpStatus.BAD_GATEWAY,
-                                "No fue posible comunicarse con GestoPago");
-        }
+    @ExceptionHandler(GestoPagoClienteDuplicadoException.class)
+    public ResponseEntity<GenericResponse<Void>> manejarClienteDuplicado(
+            GestoPagoClienteDuplicadoException exception) {
+        return respuestaError(HttpStatus.CONFLICT, exception.getMessage());
+    }
 
-        @ExceptionHandler(GestoPagoExternalResponseException.class)
-        public ResponseEntity<GenericResponse> manejarRespuestaExterna(
-                        GestoPagoExternalResponseException exception) {
+    @ExceptionHandler(GestoPagoCorreoDuplicadoException.class)
+    public ResponseEntity<GenericResponse<Void>> manejarCorreoDuplicado(
+            GestoPagoCorreoDuplicadoException exception) {
+        return respuestaError(HttpStatus.CONFLICT, exception.getMessage());
+    }
 
-                log.error("Respuesta no exitosa de GestoPago: {}",
-                                exception.getMessage());
+    @ExceptionHandler(GestoPagoCredencialesInvalidasException.class)
+    public ResponseEntity<GenericResponse<Void>> manejarCredencialesInvalidas(
+            GestoPagoCredencialesInvalidasException exception) {
+        return respuestaError(HttpStatus.UNAUTHORIZED, exception.getMessage());
+    }
 
-                return respuestaError(
-                                HttpStatus.BAD_GATEWAY,
-                                "GestoPago respondió con un error");
-        }
+    @ExceptionHandler(GestoPagoUsuarioInactivoException.class)
+    public ResponseEntity<GenericResponse<Void>> manejarUsuarioInactivo(
+            GestoPagoUsuarioInactivoException exception) {
+        return respuestaError(HttpStatus.FORBIDDEN, exception.getMessage());
+    }
 
-        @ExceptionHandler(GestoPagoSynchronizationInProgressException.class)
-        public ResponseEntity<GenericResponse> manejarSincronizacionEnProceso(
-                        GestoPagoSynchronizationInProgressException exception) {
+    @ExceptionHandler(GestoPagoUsuarioNoEncontradoException.class)
+    public ResponseEntity<GenericResponse<Void>> manejarUsuarioNoEncontrado(
+            GestoPagoUsuarioNoEncontradoException exception) {
+        return respuestaError(HttpStatus.NOT_FOUND, exception.getMessage());
+    }
 
-                log.warn("Sincronización de productos rechazada: {}", exception.getMessage());
+    @ExceptionHandler(GestoPagoContrasenaInvalidaException.class)
+    public ResponseEntity<GenericResponse<Void>> manejarContrasenaInvalida(
+            GestoPagoContrasenaInvalidaException exception) {
+        return respuestaError(HttpStatus.BAD_REQUEST, exception.getMessage());
+    }
 
-                return respuestaError(
-                                HttpStatus.TOO_MANY_REQUESTS,
-                                "Ya existe una sincronización de productos en curso");
-        }
+    @ExceptionHandler(GestoPagoAccesoDenegadoException.class)
+    public ResponseEntity<GenericResponse<Void>> manejarAccesoDenegado(
+            GestoPagoAccesoDenegadoException exception) {
+        return respuestaError(HttpStatus.FORBIDDEN, exception.getMessage());
+    }
 
-        @ExceptionHandler(GestoPagoClienteInvalidoException.class)
-        public ResponseEntity<GenericResponse> manejarClienteInvalido(
-                        GestoPagoClienteInvalidoException exception) {
+    @ExceptionHandler(HttpMessageNotReadableException.class)
+    public ResponseEntity<GenericResponse<Void>> manejarJsonInvalido(
+            HttpMessageNotReadableException exception) {
+        Throwable causa = exception.getCause();
 
-                return respuestaError(HttpStatus.BAD_REQUEST, exception.getMessage());
-        }
+        while (causa != null) {
+            if (causa instanceof InvalidFormatException formato) {
+                String campo = formato.getPath().stream()
+                        .map(JsonMappingException.Reference::getFieldName)
+                        .filter(nombre -> nombre != null && !nombre.isBlank())
+                        .collect(Collectors.joining("."));
 
-        @ExceptionHandler(GestoPagoClienteDuplicadoException.class)
-        public ResponseEntity<GenericResponse> manejarClienteDuplicado(
-                        GestoPagoClienteDuplicadoException exception) {
-
-                return respuestaError(HttpStatus.CONFLICT, exception.getMessage());
-        }
-
-        @ExceptionHandler(GestoPagoCorreoDuplicadoException.class)
-        public ResponseEntity<GenericResponse> manejarCorreoDuplicado(
-                        GestoPagoCorreoDuplicadoException exception) {
-                return respuestaError(HttpStatus.CONFLICT, exception.getMessage());
-        }
-
-        @ExceptionHandler(GestoPagoCredencialesInvalidasException.class)
-        public ResponseEntity<GenericResponse> manejarCredencialesInvalidas(
-                        GestoPagoCredencialesInvalidasException exception) {
-                return respuestaError(HttpStatus.UNAUTHORIZED, exception.getMessage());
-        }
-
-        @ExceptionHandler(GestoPagoUsuarioInactivoException.class)
-        public ResponseEntity<GenericResponse> manejarUsuarioInactivo(
-                        GestoPagoUsuarioInactivoException exception) {
-                return respuestaError(HttpStatus.FORBIDDEN, exception.getMessage());
-        }
-
-        @ExceptionHandler(GestoPagoUsuarioNoEncontradoException.class)
-        public ResponseEntity<GenericResponse> manejarUsuarioNoEncontrado(
-                        GestoPagoUsuarioNoEncontradoException exception) {
-                return respuestaError(HttpStatus.NOT_FOUND, exception.getMessage());
-        }
-
-        @ExceptionHandler(GestoPagoContrasenaInvalidaException.class)
-        public ResponseEntity<GenericResponse> manejarContrasenaInvalida(
-                        GestoPagoContrasenaInvalidaException exception) {
-                return respuestaError(HttpStatus.BAD_REQUEST, exception.getMessage());
-        }
-
-        @ExceptionHandler(GestoPagoAccesoDenegadoException.class)
-        public ResponseEntity<GenericResponse> manejarAccesoDenegado(
-                        GestoPagoAccesoDenegadoException exception) {
-                return respuestaError(HttpStatus.FORBIDDEN, exception.getMessage());
-        }
-
-        @ExceptionHandler(MethodArgumentNotValidException.class)
-        public ResponseEntity<GenericResponse> manejarCamposInvalidos(
-                        MethodArgumentNotValidException exception) {
-
-                String mensaje = exception.getBindingResult().getFieldErrors().stream()
-                                .min(Comparator.comparingInt(this::prioridadError))
-                                .map(error -> "Campo " + error.getField()
-                                                + ": " + error.getDefaultMessage())
-                                .orElse("Los datos enviados no son válidos");
-
-                return respuestaError(HttpStatus.BAD_REQUEST, mensaje);
-        }
-
-        @ExceptionHandler(HttpMessageNotReadableException.class)
-        public ResponseEntity<GenericResponse> manejarJsonInvalido(
-                        HttpMessageNotReadableException exception) {
-                Throwable causa = exception.getCause();
-                while (causa != null) {
-                        if (causa instanceof InvalidFormatException formato
-                                        && LocalDate.class.equals(formato.getTargetType())) {
-                                return respuestaError(HttpStatus.BAD_REQUEST,
-                                                "La fecha debe tener formato AAAA-MM-DD");
-                        }
-                        causa = causa.getCause();
-                }
-                return respuestaError(HttpStatus.BAD_REQUEST,
-                                "El JSON es inválido o contiene un dato con formato incorrecto");
-        }
-
-        @ExceptionHandler(MethodArgumentTypeMismatchException.class)
-        public ResponseEntity<GenericResponse> manejarParametroInvalido(
-                        MethodArgumentTypeMismatchException exception) {
-                Class<?> tipo = exception.getRequiredType();
+                Class<?> tipo = formato.getTargetType();
                 String detalle = LocalDate.class.equals(tipo)
-                                ? "debe tener formato AAAA-MM-DD"
-                                : (Integer.class.equals(tipo) || int.class.equals(tipo))
-                                                ? "debe ser un número entero"
-                                                : "tiene un formato inválido";
-                return respuestaError(HttpStatus.BAD_REQUEST,
-                                "Parámetro " + exception.getName() + ": " + detalle);
+                        ? "debe tener formato AAAA-MM-DD"
+                        : Integer.class.equals(tipo) || int.class.equals(tipo)
+                                ? "debe ser un número entero"
+                                : Boolean.class.equals(tipo) || boolean.class.equals(tipo)
+                                        ? "debe ser verdadero o falso"
+                                        : "tiene un formato inválido";
+
+                String mensaje = campo.isEmpty()
+                        ? "El JSON contiene un dato con formato incorrecto"
+                        : LocalDate.class.equals(tipo)
+                                ? "La fecha debe tener formato AAAA-MM-DD"
+                                : "Campo " + campo + ": " + detalle;
+
+                GenericResponse<Void> response = GenericResponse.error(mensaje);
+                if (!campo.isEmpty()) {
+                    response.setErrores(Map.of(campo, detalle));
+                }
+                return ResponseEntity.badRequest().body(response);
+            }
+            causa = causa.getCause();
         }
 
-        @ExceptionHandler(MissingServletRequestParameterException.class)
-        public ResponseEntity<GenericResponse> manejarParametroFaltante(
-                        MissingServletRequestParameterException exception) {
-                return respuestaError(HttpStatus.BAD_REQUEST,
-                                "Parámetro " + exception.getParameterName() + ": es obligatorio");
-        }
+        return respuestaError(HttpStatus.BAD_REQUEST,
+                "El JSON es inválido o contiene un dato con formato incorrecto");
+    }
 
-        @ExceptionHandler(DataIntegrityViolationException.class)
-        public ResponseEntity<GenericResponse> manejarRestriccionDeDatos(
-                        DataIntegrityViolationException exception) {
+    @ExceptionHandler(MethodArgumentTypeMismatchException.class)
+    public ResponseEntity<GenericResponse<Void>> manejarParametroInvalido(
+            MethodArgumentTypeMismatchException exception) {
+        Class<?> tipo = exception.getRequiredType();
+        String detalle = LocalDate.class.equals(tipo)
+                ? "debe tener formato AAAA-MM-DD"
+                : Integer.class.equals(tipo) || int.class.equals(tipo)
+                        ? "debe ser un número entero"
+                        : "tiene un formato inválido";
 
-                return respuestaError(
-                                HttpStatus.CONFLICT,
-                                "Los datos entran en conflicto con una restricción de la base de datos");
-        }
+        return respuestaError(HttpStatus.BAD_REQUEST,
+                "Parámetro " + exception.getName() + ": " + detalle);
+    }
 
-        @ExceptionHandler(GestoPagoClienteNoEncontradoException.class)
-        public ResponseEntity<GenericResponse> manejarClienteNoEncontrado(
-                        GestoPagoClienteNoEncontradoException exception) {
+    @ExceptionHandler(MissingServletRequestParameterException.class)
+    public ResponseEntity<GenericResponse<Void>> manejarParametroFaltante(
+            MissingServletRequestParameterException exception) {
+        return respuestaError(HttpStatus.BAD_REQUEST,
+                "Parámetro " + exception.getParameterName() + ": es obligatorio");
+    }
 
-                return respuestaError(HttpStatus.NOT_FOUND, exception.getMessage());
-        }
+    @ExceptionHandler(MissingRequestHeaderException.class)
+    public ResponseEntity<GenericResponse<Void>> manejarEncabezadoFaltante(
+            MissingRequestHeaderException exception) {
+        return respuestaError(HttpStatus.BAD_REQUEST,
+                "Encabezado " + exception.getHeaderName() + ": es obligatorio");
+    }
 
-        @ExceptionHandler(GestoPagoCuentaNoEncontradaException.class)
-        public ResponseEntity<GenericResponse> manejarCuentaNoEncontrada(
-                        GestoPagoCuentaNoEncontradaException exception) {
+    @ExceptionHandler(DataIntegrityViolationException.class)
+    public ResponseEntity<GenericResponse<Void>> manejarRestriccionDeDatos(
+            DataIntegrityViolationException exception) {
+        return respuestaError(HttpStatus.CONFLICT,
+                "Los datos entran en conflicto con una restricción de la base de datos");
+    }
 
-                return respuestaError(HttpStatus.NOT_FOUND, exception.getMessage());
-        }
+    @ExceptionHandler(GestoPagoClienteNoEncontradoException.class)
+    public ResponseEntity<GenericResponse<Void>> manejarClienteNoEncontrado(
+            GestoPagoClienteNoEncontradoException exception) {
+        return respuestaError(HttpStatus.NOT_FOUND, exception.getMessage());
+    }
 
-        @ExceptionHandler(GestoPagoCuentaNoCancelableException.class)
-        public ResponseEntity<GenericResponse> manejarCuentaNoCancelable(
-                        GestoPagoCuentaNoCancelableException exception) {
-                return respuestaError(HttpStatus.CONFLICT, exception.getMessage());
-        }
+    @ExceptionHandler(PersonaNoEncontradaException.class)
+    public ResponseEntity<GenericResponse<Void>> manejarPersonaNoEncontrada(
+            PersonaNoEncontradaException exception) {
+        return respuestaError(HttpStatus.NOT_FOUND, exception.getMessage());
+    }
 
-        @ExceptionHandler(Exception.class)
-        public ResponseEntity<GenericResponse> manejarErrorNoControlado(
-                        Exception exception) {
+    @ExceptionHandler(GestoPagoCuentaNoEncontradaException.class)
+    public ResponseEntity<GenericResponse<Void>> manejarCuentaNoEncontrada(
+            GestoPagoCuentaNoEncontradaException exception) {
+        return respuestaError(HttpStatus.NOT_FOUND, exception.getMessage());
+    }
 
-                log.error("Error no controlado al procesar la solicitud");
+    @ExceptionHandler(GestoPagoCuentaNoCancelableException.class)
+    public ResponseEntity<GenericResponse<Void>> manejarCuentaNoCancelable(
+            GestoPagoCuentaNoCancelableException exception) {
+        return respuestaError(HttpStatus.CONFLICT, exception.getMessage());
+    }
 
-                return respuestaError(
-                                HttpStatus.INTERNAL_SERVER_ERROR,
-                                "Ocurrió un error inesperado");
-        }
+    @ExceptionHandler(GestoPagoPagoInvalidoException.class)
+    public ResponseEntity<GenericResponse<Void>> manejarPagoInvalido(
+            GestoPagoPagoInvalidoException exception) {
+        return respuestaError(HttpStatus.BAD_REQUEST, exception.getMessage());
+    }
 
-        private ResponseEntity<GenericResponse> respuestaError(
-                        HttpStatus status,
-                        String mensaje) {
+    @ExceptionHandler({
+            GestoPagoCuentaInactivaException.class,
+            GestoPagoSaldoInsuficienteException.class
+    })
+    public ResponseEntity<GenericResponse<Void>> manejarPagoNoDisponible(
+            RuntimeException exception) {
+        return respuestaError(HttpStatus.CONFLICT, exception.getMessage());
+    }
 
-                GenericResponse response = new GenericResponse();
-                response.setCodigo(1);
-                response.setMensaje(mensaje);
+    @ExceptionHandler(GestoPagoPagoIndeterminadoException.class)
+    public ResponseEntity<GenericResponse<Void>> manejarPagoIndeterminado(
+            GestoPagoPagoIndeterminadoException exception) {
+        log.warn("El resultado del pago requiere confirmación: {}",
+                exception.getCause() == null
+                        ? "respuesta desconocida"
+                        : exception.getCause().getClass().getSimpleName());
+        return respuestaError(HttpStatus.BAD_GATEWAY, exception.getMessage());
+    }
 
-                return ResponseEntity.status(status).body(response);
-        }
+    @ExceptionHandler(GestoPagoPagoNoEncontradoException.class)
+    public ResponseEntity<GenericResponse<Void>> manejarPagoNoEncontrado(
+            GestoPagoPagoNoEncontradoException exception) {
+        return respuestaError(HttpStatus.NOT_FOUND, exception.getMessage());
+    }
 
-        private int prioridadError(FieldError error) {
-                return "NotBlank".equals(error.getCode()) || "NotNull".equals(error.getCode())
-                                ? 0 : 1;
-        }
+    @ExceptionHandler(GestoPagoPinInvalidoException.class)
+    public ResponseEntity<GenericResponse<Void>> manejarPinInvalido(
+            GestoPagoPinInvalidoException exception) {
+        return respuestaError(HttpStatus.FORBIDDEN, exception.getMessage());
+    }
+
+    @ExceptionHandler(GestoPagoPinBloqueadoException.class)
+    public ResponseEntity<GenericResponse<Void>> manejarPinBloqueado(
+            GestoPagoPinBloqueadoException exception) {
+        return respuestaError(HttpStatus.TOO_MANY_REQUESTS, exception.getMessage());
+    }
+
+    @ExceptionHandler(GestoPagoPinNoConfiguradoException.class)
+    public ResponseEntity<GenericResponse<Void>> manejarPinNoConfigurado(
+            GestoPagoPinNoConfiguradoException exception) {
+        return respuestaError(HttpStatus.CONFLICT, exception.getMessage());
+    }
+
+    @ExceptionHandler({NoHandlerFoundException.class, NoResourceFoundException.class})
+    public ResponseEntity<GenericResponse<Void>> manejarRutaInexistente(Exception exception) {
+        return respuestaError(HttpStatus.NOT_FOUND, "La ruta solicitada no existe");
+    }
+
+    @ExceptionHandler(HttpRequestMethodNotSupportedException.class)
+    public ResponseEntity<GenericResponse<Void>> manejarMetodoNoPermitido(
+            HttpRequestMethodNotSupportedException exception) {
+        return respuestaError(HttpStatus.METHOD_NOT_ALLOWED,
+                "El método HTTP no está permitido para esta ruta");
+    }
+
+    @ExceptionHandler(Exception.class)
+    public ResponseEntity<GenericResponse<Void>> manejarErrorNoControlado(Exception exception) {
+        log.error("Error no controlado al procesar la solicitud; tipo={}",
+                exception.getClass().getSimpleName());
+        return respuestaError(HttpStatus.INTERNAL_SERVER_ERROR,
+                "Ocurrió un error inesperado");
+    }
+
+    private ResponseEntity<GenericResponse<Void>> respuestaError(
+            HttpStatus status, String mensaje) {
+        return ResponseEntity.status(status).body(GenericResponse.error(mensaje));
+    }
 }

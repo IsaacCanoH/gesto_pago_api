@@ -1,20 +1,17 @@
 package com.proyecto.servicios.job;
 
 import com.proyecto.servicios.service.GestoPagoProductService;
+import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Component;
 
 @Component
+@RequiredArgsConstructor
 @Slf4j
 public class GestoPagoProductJob {
 
     private final GestoPagoProductService gestoPagoProductService;
-
-    public GestoPagoProductJob(
-            GestoPagoProductService gestoPagoProductService) {
-        this.gestoPagoProductService = gestoPagoProductService;
-    }
 
     @Scheduled(cron = "${gestopago.product.sync-cron:0 0 12 * * *}", zone = "${gestopago.product.time-zone:America/Mexico_City}")
     public void sincronizarProductos() {

@@ -14,16 +14,14 @@ import com.proyecto.servicios.exception.GestoPagoAuthenticationException;
 import com.proyecto.servicios.exception.GestoPagoFeignExceptionTranslator;
 import com.proyecto.servicios.exception.GestoPagoSynchronizationInProgressException;
 import com.proyecto.servicios.model.gestopago.GestoPagoProductoResponse;
+import com.proyecto.servicios.model.gestopago.GestoPagoProductoPaginaRequest;
 import com.proyecto.servicios.cache.GestoPagoProductoCache;
 
 import java.util.concurrent.atomic.AtomicBoolean;
 import feign.FeignException;
-import java.util.ArrayList;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
-import java.util.function.Function;
-import java.util.stream.Collectors;
 import jakarta.xml.bind.JAXBContext;
 import jakarta.xml.bind.JAXBException;
 import jakarta.xml.bind.Unmarshaller;
@@ -32,6 +30,9 @@ import java.io.StringReader;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.PageRequest;
+import org.springframework.data.domain.Sort;
 import org.springframework.stereotype.Service;
 
 @Service
@@ -45,6 +46,7 @@ public class GestoPagoProductServiceImpl implements GestoPagoProductService {
         private final GestoPagoProductoMapper productoMapper;
         private final AtomicBoolean sincronizacionEnProceso = new AtomicBoolean(false);
         private final GestoPagoProductoCache productoCache;
+        private final GestoPagoCatalogoPersistenceService catalogoPersistenceService;
 
         @Value("${gestopago.auth.id-distribuidor}")
         private Integer idDistribuidor;
@@ -123,16 +125,10 @@ public class GestoPagoProductServiceImpl implements GestoPagoProductService {
                 try {
                         Map<Long, Producto> productosPorId = indexarProductos(descargarListaProductos());
 
-                        if (productosPorId.isEmpty()) {
-                                log.warn("GestoPago no devolvió productos válidos para sincronizar");
-                                return 0;
-                        }
-
-                        List<GestoPagoProducto> productosParaGuardar = prepararProductos(productosPorId);
-                        productoRepository.saveAll(productosParaGuardar);
+                        int total = catalogoPersistenceService.guardarCatalogo(productosPorId);
                         productoCache.invalidar();
-                        log.info("Productos de GestoPago sincronizados: {}", productosParaGuardar.size());
-                        return productosParaGuardar.size();
+                        log.info("Productos de GestoPago sincronizados: {}", total);
+                        return total;
                 } finally {
                         sincronizacionEnProceso.set(false);
                 }
@@ -140,32 +136,22 @@ public class GestoPagoProductServiceImpl implements GestoPagoProductService {
 
         private Map<Long, Producto> indexarProductos(GestoPagoProductListResponse response) {
                 Map<Long, Producto> productosPorId = new LinkedHashMap<>();
+                if (response.getProductos() == null || response.getProductos().isEmpty()) {
+                        throw new GestoPagoExternalResponseException(
+                                        "GestoPago devolvió un catálogo vacío; se conserva el catálogo anterior");
+                }
                 for (Producto producto : response.getProductos()) {
-                        if (producto.getIdProducto() != null) {
-                                productosPorId.put(producto.getIdProducto(), producto);
+                        if (producto == null || producto.getIdProducto() == null || producto.getIdProducto() <= 0
+                                        || producto.getServicio() == null || producto.getServicio().isBlank()
+                                        || producto.getServicio().length() > 255
+                                        || producto.getProducto() == null || producto.getProducto().isBlank()
+                                        || producto.getProducto().length() > 500
+                                        || productosPorId.putIfAbsent(producto.getIdProducto(), producto) != null) {
+                                throw new GestoPagoExternalResponseException(
+                                                "El catálogo de GestoPago contiene productos incompletos o repetidos");
                         }
                 }
                 return productosPorId;
-        }
-
-        private List<GestoPagoProducto> prepararProductos(Map<Long, Producto> productosPorId) {
-                Map<Long, GestoPagoProducto> existentes = productoRepository
-                                .findAllByIdProductoIn(productosPorId.keySet())
-                                .stream()
-                                .collect(Collectors.toMap(GestoPagoProducto::getIdProducto, Function.identity()));
-
-                List<GestoPagoProducto> productosParaGuardar = new ArrayList<>();
-                for (Producto productoXml : productosPorId.values()) {
-                        GestoPagoProducto producto = existentes.get(productoXml.getIdProducto());
-                        if (producto == null) {
-                                producto = productoMapper.toEntity(productoXml);
-                        } else {
-                                productoMapper.updateEntity(productoXml, producto);
-                        }
-                        producto.setActivo(true);
-                        productosParaGuardar.add(producto);
-                }
-                return productosParaGuardar;
         }
 
         @Override
@@ -174,11 +160,24 @@ public class GestoPagoProductServiceImpl implements GestoPagoProductService {
                                 .orElseGet(this::consultarYCachearProductos);
         }
 
+        @Override
+        public Page<GestoPagoProductoResponse> consultarProductosPaginados(
+                        GestoPagoProductoPaginaRequest request) {
+                PageRequest pagina = PageRequest.of(request.getPagina(), request.getTamanio(),
+                                Sort.by("idProducto").ascending());
+                Page<GestoPagoProducto> productos = productoRepository.findAll(pagina);
+                if (productos.getTotalElements() == 0) {
+                        sincronizarProductos();
+                        productos = productoRepository.findAll(pagina);
+                }
+                return productos.map(productoMapper::toResponse);
+        }
+
         private List<GestoPagoProductoResponse> consultarYCachearProductos() {
-                List<GestoPagoProducto> productos = productoRepository.findAll();
+                List<GestoPagoProducto> productos = productoRepository.findAllByActivoTrue();
                 if (productos.isEmpty()) {
                         sincronizarProductos();
-                        productos = productoRepository.findAll();
+                        productos = productoRepository.findAllByActivoTrue();
                 }
                 List<GestoPagoProductoResponse> catalogo = productoMapper.toResponseList(productos);
                 if (!catalogo.isEmpty()) {

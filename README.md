@@ -22,15 +22,21 @@ La base de datos también protege los datos importantes: CURP y RFC son únicos,
 
 Antes de guardar un cliente se valida que tenga al menos 18 años y que los campos obligatorios respeten sus formatos y longitudes. Esto incluye nombres con letras y espacios, CURP de 18 caracteres, RFC de 13 caracteres para persona física, correo válido, teléfonos de 10 dígitos, código postal de 5 dígitos e ingreso mensual mayor que cero. El segundo nombre, el teléfono alternativo y el número interior son opcionales. También se rechazan CURP, RFC y correos ya registrados.
 
-La API permite buscar clientes por ID, CURP, RFC, correo o número de cuenta, consultar el saldo de una cuenta y listar clientes o cuentas activos. También ofrece un filtro de clientes por rango de fechas de creación. Los listados están paginados y muestran solo un resumen para que la respuesta no sea innecesariamente grande; la consulta individual entrega el detalle del cliente, su domicilio y sus cuentas.
+La API concentra las consultas de clientes en `POST /clientes/buscar`. Recibe un JSON con filtros opcionales por ID, CURP, RFC, correo, número de cuenta, estado activo y fechas de creación; los filtros enviados se combinan. Por defecto, CURP y RFC se buscan completos; con `"parcial": true` se admiten fragmentos. `"detalle": true` devuelve también la información completa cuando la búsqueda identifica a un único cliente. Los resultados se paginan y muestran resúmenes para evitar respuestas innecesariamente grandes. `POST /cuentas/buscar` permite consultar cuentas por número o listar las activas con `"soloActivas": true`. Ambos usan `pagina` y `tamanio` en el JSON, sin parámetros en la URL.
 
-Los datos editables pueden cambiarse por completo con `PUT /clientes/{id}` o de forma parcial con `PATCH /clientes/{id}`. CURP, RFC y número de cuenta no forman parte de esas actualizaciones. Si cambia el correo, también se actualiza el del usuario, que es el que utiliza para iniciar sesión. Al dar de baja a un cliente, el sistema marca como inactivos al cliente, su usuario y sus cuentas; no elimina las filas. Una cuenta puede cancelarse por separado si pertenece al usuario autenticado y tiene saldo cero. En ese caso se inactiva la cuenta, pero el cliente y su usuario conservan el acceso.
+Por ejemplo, para localizar clientes activos cuyo CURP y RFC contengan ciertos fragmentos se envía a `/clientes/buscar` el cuerpo `{"curp":"CAN","rfc":"5G3","parcial":true,"activa":true}`. Para consultar un cliente completo se usa el mismo endpoint con `{"id":38,"detalle":true}`. Si no se envían filtros (`{}`), devuelve la primera página de clientes.
+
+Los datos editables pueden cambiarse por completo con `PUT /clientes` o de forma parcial con `PATCH /clientes`; el ID se envía en el JSON. CURP, RFC y número de cuenta no forman parte de esas actualizaciones. Si cambia el correo, también se actualiza el del usuario, que es el que utiliza para iniciar sesión. `POST /clientes/desactivar` recibe el ID y marca como inactivos al cliente, su usuario y sus cuentas; no elimina las filas. `POST /cuentas/cancelar` recibe el número de cuenta y solo la cancela si pertenece al usuario autenticado y tiene saldo cero. En ese caso, el cliente y su usuario conservan el acceso.
+
+En `PATCH /clientes`, omitir un campo conserva su valor. Enviar `null` explícitamente en `segundoNombre`, `telefonoAlternativo` o `domicilio.numeroInterior` lo limpia; por ejemplo, `{"id":38,"telefonoAlternativo":null}`. Los demás campos no se borran con `null`, pues son obligatorios o están controlados por el sistema.
 
 ## Acceso y manejo de errores
 
 Durante el registro se solicita una contraseña de al menos ocho caracteres, con mayúscula, minúscula, número y carácter especial. Se guarda únicamente su hash BCrypt. El inicio de sesión verifica el correo, la contraseña y que tanto el usuario como su cliente sigan activos; si todo es correcto, devuelve un JWT con su fecha de expiración. El registro y el login son públicos, mientras que el resto de los servicios requiere un token válido. Cada usuario solo puede consultar su propio perfil o cambiar su propia contraseña; para cambiarla debe indicar la actual y elegir una diferente. La cancelación de una cuenta también comprueba que le pertenezca.
 
-Los errores se responden con un mensaje claro y un estado HTTP acorde al caso: por ejemplo, `400` para datos inválidos, `401` para falta de autenticación o credenciales incorrectas, `403` para acceso denegado o usuario inactivo, `404` cuando no se encuentra un registro y `409` para duplicados o conflictos de negocio. Las excepciones se manejan de forma centralizada para mantener respuestas consistentes y no exponer datos sensibles.
+El perfil se consulta con `POST /usuarios/consultar` enviando `{"id":7}` y la contraseña se cambia con `PUT /usuarios/password`; en ambos casos el sistema comprueba al usuario autenticado. El ID de usuario no se vuelve a enviar al cambiar la contraseña.
+
+Las respuestas usan `codigo` y `mensaje`; las exitosas incluyen `datos` cuando corresponde y los errores de validación incluyen `errores` por campo. Se emplean estados HTTP acordes al caso: `400` para datos inválidos, `401` para falta de autenticación o credenciales incorrectas, `403` para acceso denegado o usuario inactivo, `404` cuando no se encuentra un registro o una ruta, `405` si la ruta existe pero no admite el método usado, y `409` para duplicados o conflictos de negocio. Las excepciones se manejan de forma centralizada y los errores internos no revelan trazas ni datos sensibles. Las rutas protegidas siguen exigiendo token antes de resolver el endpoint.
 
 ## Ejecución, documentación y pruebas
 
@@ -50,6 +56,7 @@ Se implementó la consulta diaria de productos de GestoPago. La aplicación obti
 - La lista se consulta mediante `GET /sistema/service/getProductList.do` enviando el header `Authorization: Bearer <token>`.
 - La respuesta XML se convierte a DTOs con JAXB. Los productos se insertan o actualizan por `idProducto` en la tabla `gestopago_productos`.
 - También existe un endpoint manual, `POST /gestopago/productos/sincronizar`, y un job programado para ejecutarse diariamente a las 12:00, hora de Ciudad de México.
+- Para consultar el catálogo por páginas se utiliza `POST /gestopago/productos/paginar` con un JSON como `{"pagina":0,"tamanio":20}`; devuelve `content` y los metadatos de página. Esta consulta se pagina en PostgreSQL y admite un máximo de 100 productos por página. Se conserva `GET /gestopago/productos` con su respuesta anterior para no afectar a quienes ya lo consumen.
 
 ## Configuración
 
@@ -74,3 +81,15 @@ Para ejecutarlas:
 ```powershell
 .\gradlew.bat test
 ```
+
+# Pagos de servicios y recargas
+
+Para pagar con `POST /pagos`, el usuario inicia sesión y envía el token, una cuenta propia y activa, el servicio y producto del catálogo, `tipoFront`, el importe, la referencia y su PIN de seis dígitos. Se admiten recargas (`tipoFront` 1, con precio fijo y teléfono o identificador) y servicios (`tipoFront` 2, con referencia e importe). La API comprueba el PIN, el saldo y que el producto esté activo y corresponda al servicio y tipo de operación. El PIN se solicita al registrar clientes nuevos, se guarda como hash en `gestopago_usuarios` y se bloquea 15 minutos tras cinco intentos fallidos. Los usuarios anteriores, cuyo PIN quedó sin configurar, no pueden realizar pagos.
+
+Antes de contactar a PuntoRed, se genera un UPC único y se retiene el importe bajo bloqueo de la cuenta, sin descontarlo aún ni agregar comisión. La solicitud se cifra y se envía con un token Bearer reutilizable. El UPC y los datos cifrados quedan guardados para consultar `confirmTx` si la respuesta es incierta. Un timeout o un HTTP 401/403 deja el pago pendiente: no se repite `sendTx`. El código `01` confirma el éxito; `02`, el rechazo; `06`, `82` y los códigos desconocidos requieren confirmación. Solo ante un éxito confirmado se descuenta el saldo una vez; ante un rechazo confirmado se libera la retención. `POST /pagos/consultar`, con el UPC en el body, permite al dueño de la cuenta conocer el resultado. Conviene consultar antes de crear otro pago, porque repetir `POST /pagos` podría generar un segundo cargo.
+
+El catálogo sincronizado actualiza los productos y desactiva los que PuntoRed ya no entrega, sin borrar su historial. Una respuesta vacía o incompleta no reemplaza el catálogo vigente. Para los servicios se validan la referencia, la relación entre servicio y producto y un importe positivo de hasta dos decimales. El catálogo no informa mínimos ni máximos por producto, por lo que no se aplican límites particulares sin confirmarlos con PuntoRed.
+
+Los pagos inciertos se consultan automáticamente durante 24 horas. Si siguen pendientes después, conservan la retención, se marcan para revisión manual y generan una alerta; el procedimiento está en [conciliación de pagos](docs/conciliacion-pagos.md). Las credenciales y claves se configuran mediante variables de entorno; en local también puede cargarse un `.env` ignorado por Git. Los logs no incluyen PIN, tokens, referencias ni respuestas libres del proveedor.
+
+Las pruebas se ejecutan con `.\gradlew.bat test`. La prueba de integración usa PostgreSQL y una base temporal configurada con `GESTOPAGO_TEST_DB_URL`, `GESTOPAGO_TEST_DB_USER` y `GESTOPAGO_TEST_DB_PASSWORD`; comprueba la concurrencia de reservas y que un pago exitoso se descuente una sola vez. Para probar pagos reales, PuntoRed debe autorizar la IP de origen.

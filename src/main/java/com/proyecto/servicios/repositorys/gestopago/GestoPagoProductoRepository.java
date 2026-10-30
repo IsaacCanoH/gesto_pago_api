@@ -6,6 +6,7 @@ import org.springframework.stereotype.Repository;
 
 import java.util.Collection;
 import java.util.List;
+import java.util.Optional;
 
 @Repository
 public interface GestoPagoProductoRepository
@@ -13,4 +14,8 @@ public interface GestoPagoProductoRepository
 
     List<GestoPagoProducto> findAllByIdProductoIn(
             Collection<Long> idsProducto);
+
+    List<GestoPagoProducto> findAllByActivoTrue();
+
+    Optional<GestoPagoProducto> findByIdProducto(Long idProducto);
 }
