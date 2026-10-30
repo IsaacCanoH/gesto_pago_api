@@ -81,3 +81,15 @@ Para ejecutarlas:
 ```powershell
 .\gradlew.bat test
 ```
+
+# Pagos de servicios y recargas
+
+Para pagar con `POST /pagos`, el usuario inicia sesión y envía el token, una cuenta propia y activa, el servicio y producto del catálogo, `tipoFront`, el importe, la referencia y su PIN de seis dígitos. Se admiten recargas (`tipoFront` 1, con precio fijo y teléfono o identificador) y servicios (`tipoFront` 2, con referencia e importe). La API comprueba el PIN, el saldo y que el producto esté activo y corresponda al servicio y tipo de operación. El PIN se solicita al registrar clientes nuevos, se guarda como hash en `gestopago_usuarios` y se bloquea 15 minutos tras cinco intentos fallidos. Los usuarios anteriores, cuyo PIN quedó sin configurar, no pueden realizar pagos.
+
+Antes de contactar a PuntoRed, se genera un UPC único y se retiene el importe bajo bloqueo de la cuenta, sin descontarlo aún ni agregar comisión. La solicitud se cifra y se envía con un token Bearer reutilizable. El UPC y los datos cifrados quedan guardados para consultar `confirmTx` si la respuesta es incierta. Un timeout o un HTTP 401/403 deja el pago pendiente: no se repite `sendTx`. El código `01` confirma el éxito; `02`, el rechazo; `06`, `82` y los códigos desconocidos requieren confirmación. Solo ante un éxito confirmado se descuenta el saldo una vez; ante un rechazo confirmado se libera la retención. `POST /pagos/consultar`, con el UPC en el body, permite al dueño de la cuenta conocer el resultado. Conviene consultar antes de crear otro pago, porque repetir `POST /pagos` podría generar un segundo cargo.
+
+El catálogo sincronizado actualiza los productos y desactiva los que PuntoRed ya no entrega, sin borrar su historial. Una respuesta vacía o incompleta no reemplaza el catálogo vigente. Para los servicios se validan la referencia, la relación entre servicio y producto y un importe positivo de hasta dos decimales. El catálogo no informa mínimos ni máximos por producto, por lo que no se aplican límites particulares sin confirmarlos con PuntoRed.
+
+Los pagos inciertos se consultan automáticamente durante 24 horas. Si siguen pendientes después, conservan la retención, se marcan para revisión manual y generan una alerta; el procedimiento está en [conciliación de pagos](docs/conciliacion-pagos.md). Las credenciales y claves se configuran mediante variables de entorno; en local también puede cargarse un `.env` ignorado por Git. Los logs no incluyen PIN, tokens, referencias ni respuestas libres del proveedor.
+
+Las pruebas se ejecutan con `.\gradlew.bat test`. La prueba de integración usa PostgreSQL y una base temporal configurada con `GESTOPAGO_TEST_DB_URL`, `GESTOPAGO_TEST_DB_USER` y `GESTOPAGO_TEST_DB_PASSWORD`; comprueba la concurrencia de reservas y que un pago exitoso se descuente una sola vez. Para probar pagos reales, PuntoRed debe autorizar la IP de origen.
