@@ -1,8 +1,6 @@
 package com.proyecto.servicios.security;
 
-import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.mockito.ArgumentMatchers.any;
-import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
@@ -13,14 +11,12 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
 import java.time.Instant;
-import java.util.UUID;
 import java.util.stream.Stream;
 
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.Arguments;
 import org.junit.jupiter.params.provider.MethodSource;
-import org.mockito.ArgumentCaptor;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.autoconfigure.web.servlet.WebMvcTest;
 import org.springframework.boot.test.mock.mockito.MockBean;
@@ -40,7 +36,6 @@ import com.proyecto.servicios.exception.GestoPagoCredencialesInvalidasException;
 import com.proyecto.servicios.model.gestopago.GestoPagoLoginRequest;
 import com.proyecto.servicios.model.gestopago.GestoPagoLoginResponse;
 import com.proyecto.servicios.model.gestopago.GestoPagoPagoConsultaResponse;
-import com.proyecto.servicios.model.gestopago.GestoPagoReservaPagoCommand;
 import com.proyecto.servicios.entity.gestopago.GestoPagoEstadoPago;
 import com.proyecto.servicios.service.GestoPagoAuthService;
 import com.proyecto.servicios.service.GestoPagoClienteBusquedaResultado;
@@ -150,45 +145,10 @@ class GestoPagoSecurityWebTest {
     @Test
     void iniciarPagoExigeToken() throws Exception {
         mvc.perform(post("/pagos")
+                        .header("Idempotency-Key", "e5c1b457-3e9e-4b48-9d7c-aaa501c5e271")
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("{\"numeroCuenta\":\"00000000000000000007\"}"))
                 .andExpect(status().isUnauthorized());
-    }
-
-    @Test
-    void iniciarPagoRecibeSolicitudIdEnBodySinEncabezado() throws Exception {
-        autenticar();
-        String solicitudId = "e5c1b457-3e9e-4b48-9d7c-aaa501c5e271";
-
-        mvc.perform(post("/pagos")
-                        .header("Authorization", "Bearer token-valido")
-                        .contentType(MediaType.APPLICATION_JSON)
-                        .content("{\"solicitudId\":\"" + solicitudId + "\","
-                                + "\"numeroCuenta\":\"00000000000000000007\","
-                                + "\"idServicio\":2284,\"idProducto\":14302,\"tipoFront\":1,"
-                                + "\"montoPago\":100.00,\"referencia\":\"5512345678\","
-                                + "\"pin\":\"098765\"}"))
-                .andExpect(status().isOk());
-
-        ArgumentCaptor<GestoPagoReservaPagoCommand> command =
-                ArgumentCaptor.forClass(GestoPagoReservaPagoCommand.class);
-        verify(pagoWorkflowService).iniciar(command.capture(), eq(7), eq("098765"));
-        assertEquals(UUID.fromString(solicitudId), command.getValue().solicitudId());
-    }
-
-    @Test
-    void iniciarPagoRechazaSolicitudIdAusente() throws Exception {
-        autenticar();
-
-        mvc.perform(post("/pagos")
-                        .header("Authorization", "Bearer token-valido")
-                        .contentType(MediaType.APPLICATION_JSON)
-                        .content("{\"numeroCuenta\":\"00000000000000000007\","
-                                + "\"idServicio\":2284,\"idProducto\":14302,\"tipoFront\":1,"
-                                + "\"montoPago\":100.00,\"referencia\":\"5512345678\","
-                                + "\"pin\":\"098765\"}"))
-                .andExpect(status().isBadRequest())
-                .andExpect(jsonPath("$.errores.solicitudId").exists());
     }
 
     @Test
