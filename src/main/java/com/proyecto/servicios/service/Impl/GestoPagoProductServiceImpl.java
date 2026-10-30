@@ -14,6 +14,7 @@ import com.proyecto.servicios.exception.GestoPagoAuthenticationException;
 import com.proyecto.servicios.exception.GestoPagoFeignExceptionTranslator;
 import com.proyecto.servicios.exception.GestoPagoSynchronizationInProgressException;
 import com.proyecto.servicios.model.gestopago.GestoPagoProductoResponse;
+import com.proyecto.servicios.model.gestopago.GestoPagoProductoPaginaRequest;
 import com.proyecto.servicios.cache.GestoPagoProductoCache;
 
 import java.util.concurrent.atomic.AtomicBoolean;
@@ -29,6 +30,9 @@ import java.io.StringReader;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.PageRequest;
+import org.springframework.data.domain.Sort;
 import org.springframework.stereotype.Service;
 
 @Service
@@ -154,6 +158,19 @@ public class GestoPagoProductServiceImpl implements GestoPagoProductService {
         public List<GestoPagoProductoResponse> consultarProductos() {
                 return productoCache.consultarTodos()
                                 .orElseGet(this::consultarYCachearProductos);
+        }
+
+        @Override
+        public Page<GestoPagoProductoResponse> consultarProductosPaginados(
+                        GestoPagoProductoPaginaRequest request) {
+                PageRequest pagina = PageRequest.of(request.getPagina(), request.getTamanio(),
+                                Sort.by("idProducto").ascending());
+                Page<GestoPagoProducto> productos = productoRepository.findAll(pagina);
+                if (productos.getTotalElements() == 0) {
+                        sincronizarProductos();
+                        productos = productoRepository.findAll(pagina);
+                }
+                return productos.map(productoMapper::toResponse);
         }
 
         private List<GestoPagoProductoResponse> consultarYCachearProductos() {

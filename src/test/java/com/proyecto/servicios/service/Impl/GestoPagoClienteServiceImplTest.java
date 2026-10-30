@@ -2,6 +2,7 @@ package com.proyecto.servicios.service.Impl;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertSame;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
@@ -37,6 +38,7 @@ import com.proyecto.servicios.model.gestopago.GestoPagoClienteActualizacionReque
 import com.proyecto.servicios.model.gestopago.GestoPagoClienteParcialRequest;
 import com.proyecto.servicios.model.gestopago.GestoPagoClienteRegistroRequest;
 import com.proyecto.servicios.model.gestopago.GestoPagoDomicilioRequest;
+import com.proyecto.servicios.model.gestopago.GestoPagoDomicilioParcialRequest;
 import com.proyecto.servicios.repositorys.gestopago.GestoPagoClienteRepository;
 import com.proyecto.servicios.repositorys.gestopago.GestoPagoCuentaRepository;
 import com.proyecto.servicios.repositorys.gestopago.GestoPagoDomicilioRepository;
@@ -182,6 +184,50 @@ class GestoPagoClienteServiceImplTest {
 
         assertEquals("nuevo@example.com", usuario.getCorreo());
         verify(usuarioRepository).existsByCorreoIgnoreCase("nuevo@example.com");
+    }
+
+    @Test
+    void limpiaSoloOpcionalesEnviadosComoNullEnPatch() {
+        GestoPagoCliente cliente = new GestoPagoCliente();
+        cliente.setSegundoNombre("Luis");
+        cliente.setTelefonoAlternativo("5512345678");
+        GestoPagoDomicilio domicilio = new GestoPagoDomicilio();
+        domicilio.setNumeroInterior("2");
+        GestoPagoClienteParcialRequest request = new GestoPagoClienteParcialRequest();
+        request.setSegundoNombre(null);
+        request.setTelefonoAlternativo(null);
+        GestoPagoDomicilioParcialRequest domicilioRequest = new GestoPagoDomicilioParcialRequest();
+        domicilioRequest.setNumeroInterior(null);
+        request.setDomicilio(domicilioRequest);
+
+        when(clienteRepository.findById(7)).thenReturn(Optional.of(cliente));
+        when(domicilioRepository.findByCliente_Id(7)).thenReturn(Optional.of(domicilio));
+
+        service.actualizarClienteParcial(7, request);
+
+        assertNull(cliente.getSegundoNombre());
+        assertNull(cliente.getTelefonoAlternativo());
+        assertNull(domicilio.getNumeroInterior());
+    }
+
+    @Test
+    void conservaOpcionalesOmitidosEnPatch() {
+        GestoPagoCliente cliente = new GestoPagoCliente();
+        cliente.setSegundoNombre("Luis");
+        cliente.setTelefonoAlternativo("5512345678");
+        GestoPagoDomicilio domicilio = new GestoPagoDomicilio();
+        domicilio.setNumeroInterior("2");
+        GestoPagoClienteParcialRequest request = new GestoPagoClienteParcialRequest();
+        request.setDomicilio(new GestoPagoDomicilioParcialRequest());
+
+        when(clienteRepository.findById(7)).thenReturn(Optional.of(cliente));
+        when(domicilioRepository.findByCliente_Id(7)).thenReturn(Optional.of(domicilio));
+
+        service.actualizarClienteParcial(7, request);
+
+        assertEquals("Luis", cliente.getSegundoNombre());
+        assertEquals("5512345678", cliente.getTelefonoAlternativo());
+        assertEquals("2", domicilio.getNumeroInterior());
     }
 
     @Test
