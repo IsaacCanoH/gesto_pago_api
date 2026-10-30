@@ -13,6 +13,7 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.http.converter.HttpMessageNotReadableException;
 import org.springframework.validation.FieldError;
 import org.springframework.web.bind.MissingServletRequestParameterException;
+import org.springframework.web.bind.MissingRequestHeaderException;
 import org.springframework.web.bind.MethodArgumentNotValidException;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
@@ -168,6 +169,13 @@ public class GlobalExceptionHandler {
                                 "Parámetro " + exception.getParameterName() + ": es obligatorio");
         }
 
+        @ExceptionHandler(MissingRequestHeaderException.class)
+        public ResponseEntity<GenericResponse> manejarEncabezadoFaltante(
+                        MissingRequestHeaderException exception) {
+                return respuestaError(HttpStatus.BAD_REQUEST,
+                                "Encabezado " + exception.getHeaderName() + ": es obligatorio");
+        }
+
         @ExceptionHandler(DataIntegrityViolationException.class)
         public ResponseEntity<GenericResponse> manejarRestriccionDeDatos(
                         DataIntegrityViolationException exception) {
@@ -197,11 +205,53 @@ public class GlobalExceptionHandler {
                 return respuestaError(HttpStatus.CONFLICT, exception.getMessage());
         }
 
+        @ExceptionHandler(GestoPagoPagoInvalidoException.class)
+        public ResponseEntity<GenericResponse> manejarPagoInvalido(
+                        GestoPagoPagoInvalidoException exception) {
+                return respuestaError(HttpStatus.BAD_REQUEST, exception.getMessage());
+        }
+
+        @ExceptionHandler({GestoPagoCuentaInactivaException.class, GestoPagoSaldoInsuficienteException.class})
+        public ResponseEntity<GenericResponse> manejarPagoNoDisponible(RuntimeException exception) {
+                return respuestaError(HttpStatus.CONFLICT, exception.getMessage());
+        }
+
+        @ExceptionHandler(GestoPagoPagoIndeterminadoException.class)
+        public ResponseEntity<GenericResponse> manejarPagoIndeterminado(
+                        GestoPagoPagoIndeterminadoException exception) {
+                log.warn("El resultado del pago requiere confirmación: {}",
+                                exception.getCause() == null ? "respuesta desconocida"
+                                                : exception.getCause().getClass().getSimpleName());
+                return respuestaError(HttpStatus.BAD_GATEWAY, exception.getMessage());
+        }
+
+        @ExceptionHandler(GestoPagoPagoNoEncontradoException.class)
+        public ResponseEntity<GenericResponse> manejarPagoNoEncontrado(
+                        GestoPagoPagoNoEncontradoException exception) {
+                return respuestaError(HttpStatus.NOT_FOUND, exception.getMessage());
+        }
+
+        @ExceptionHandler(GestoPagoPinInvalidoException.class)
+        public ResponseEntity<GenericResponse> manejarPinInvalido(GestoPagoPinInvalidoException exception) {
+                return respuestaError(HttpStatus.FORBIDDEN, exception.getMessage());
+        }
+
+        @ExceptionHandler(GestoPagoPinBloqueadoException.class)
+        public ResponseEntity<GenericResponse> manejarPinBloqueado(GestoPagoPinBloqueadoException exception) {
+                return respuestaError(HttpStatus.TOO_MANY_REQUESTS, exception.getMessage());
+        }
+
+        @ExceptionHandler(GestoPagoPinNoConfiguradoException.class)
+        public ResponseEntity<GenericResponse> manejarPinNoConfigurado(GestoPagoPinNoConfiguradoException exception) {
+                return respuestaError(HttpStatus.CONFLICT, exception.getMessage());
+        }
+
         @ExceptionHandler(Exception.class)
         public ResponseEntity<GenericResponse> manejarErrorNoControlado(
                         Exception exception) {
 
-                log.error("Error no controlado al procesar la solicitud");
+                log.error("Error no controlado al procesar la solicitud; tipo={}",
+                                exception.getClass().getSimpleName());
 
                 return respuestaError(
                                 HttpStatus.INTERNAL_SERVER_ERROR,

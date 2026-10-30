@@ -9,6 +9,7 @@ import com.proyecto.servicios.service.GestoPagoTokenService;
 import com.proyecto.servicios.exception.GestoPagoAuthenticationException;
 import com.proyecto.servicios.exception.GestoPagoFeignExceptionTranslator;
 import feign.FeignException;
+import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.scheduling.annotation.Scheduled;
@@ -17,6 +18,7 @@ import org.springframework.stereotype.Service;
 import java.util.Optional;
 
 @Service
+@RequiredArgsConstructor
 @Slf4j
 public class GestoPagoTokenServiceImpl implements GestoPagoTokenService {
 
@@ -33,16 +35,9 @@ public class GestoPagoTokenServiceImpl implements GestoPagoTokenService {
     @Value("${gestopago.auth.password}")
     private String password;
 
-    public GestoPagoTokenServiceImpl(GestoPagoAuthClient gestoPagoAuthClient,
-            GestoPagoTokenRepository tokenRepository,
-            GestoPagoTokenMapper tokenMapper) {
-        this.gestoPagoAuthClient = gestoPagoAuthClient;
-        this.tokenRepository = tokenRepository;
-        this.tokenMapper = tokenMapper;
-    }
-
     @Override
-    @Scheduled(fixedRateString = "${gestopago.auth.refresh-rate-ms:3600000}", initialDelay = 0)
+    @Scheduled(cron = "${gestopago.auth.refresh-cron:0 5 0 * * *}",
+            zone = "${gestopago.product.time-zone:America/Mexico_City}")
     public void renovarToken() {
         try {
             renovarTokenAhora();

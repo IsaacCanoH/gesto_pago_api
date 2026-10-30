@@ -93,6 +93,11 @@ test {
     useJUnitPlatform()
 }
 
+// La configuración local ignorada por Git nunca debe viajar en el ejecutable.
+tasks.named('bootJar') {
+    exclude('application.properties')
+}
+
 springBoot {
     buildInfo {
     }

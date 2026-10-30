@@ -7,9 +7,12 @@ import java.util.Optional;
 import org.springframework.data.jpa.repository.EntityGraph;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Query;
+import org.springframework.data.jpa.repository.Lock;
+import org.springframework.data.repository.query.Param;
 import org.springframework.stereotype.Repository;
 
 import com.proyecto.servicios.entity.gestopago.GestoPagoUsuario;
+import jakarta.persistence.LockModeType;
 
 @Repository
 public interface GestoPagoUsuarioRepository extends JpaRepository<GestoPagoUsuario, Integer> {
@@ -26,6 +29,10 @@ public interface GestoPagoUsuarioRepository extends JpaRepository<GestoPagoUsuar
     Optional<GestoPagoUsuario> findById(Integer id);
 
     Optional<GestoPagoUsuario> findByCliente_Id(Integer clienteId);
+
+    @Lock(LockModeType.PESSIMISTIC_WRITE)
+    @Query("select usuario from GestoPagoUsuario usuario join fetch usuario.cliente where usuario.id = :id")
+    Optional<GestoPagoUsuario> findByIdParaPin(@Param("id") Integer id);
 
     List<GestoPagoUsuario> findByCliente_IdIn(Collection<Integer> clienteIds);
 }

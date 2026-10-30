@@ -64,6 +64,7 @@ public class GestoPagoClienteServiceImpl implements GestoPagoClienteService {
         usuario.setCliente(cliente);
         usuario.setCorreo(request.getCorreo());
         usuario.setPasswordHash(passwordHash);
+        usuario.setPinHash(passwordEncoder.encode(request.getPin()));
         usuarioRepository.save(usuario);
 
         return new GestoPagoClienteRegistroResponse(

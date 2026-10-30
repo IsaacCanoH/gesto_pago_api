@@ -111,6 +111,7 @@ class GestoPagoValidacionWebTest {
                                   "rfc": "  CANO0504295G3  ",
                                   "correo": "  cliente@example.com  ",
                                   "contrasena": " ClaveSegura1! ",
+                                  "pin": "123456",
                                   "telefonoMovil": " 5524698569 ",
                                   "sexo": "HOMBRE",
                                   "nacionalidad": "MEXICANA",
