@@ -6,9 +6,14 @@ import org.springframework.boot.CommandLineRunner;
 import org.springframework.boot.SpringApplication;
 import org.springframework.boot.autoconfigure.SpringBootApplication;
 import org.springframework.boot.info.BuildProperties;
+import org.springframework.boot.context.properties.EnableConfigurationProperties;
 import org.springframework.cloud.openfeign.EnableFeignClients;
 import org.springframework.context.ApplicationContext;
 import org.springframework.scheduling.annotation.EnableScheduling;
+
+import com.proyecto.servicios.config.GestoPagoPagoProperties;
+import com.proyecto.servicios.config.GestoPagoCifradoProperties;
+import com.proyecto.servicios.config.GestoPagoIdentidadProveedorProperties;
 
 import java.time.ZoneId;
 import java.time.format.DateTimeFormatter;
@@ -18,6 +23,8 @@ import java.time.format.DateTimeFormatter;
 @SpringBootApplication
 @EnableScheduling
 @EnableFeignClients
+@EnableConfigurationProperties({GestoPagoPagoProperties.class,
+        GestoPagoCifradoProperties.class, GestoPagoIdentidadProveedorProperties.class})
 @Slf4j
 
 public class App implements CommandLineRunner {

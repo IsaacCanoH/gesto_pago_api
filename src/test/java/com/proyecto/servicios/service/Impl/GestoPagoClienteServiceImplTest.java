@@ -72,6 +72,7 @@ class GestoPagoClienteServiceImplTest {
         GestoPagoDomicilio domicilio = new GestoPagoDomicilio();
 
         when(passwordEncoder.encode("ClaveSegura1!")).thenReturn("hash-bcrypt");
+        when(passwordEncoder.encode("123456")).thenReturn("hash-pin");
         when(clienteMapper.toCliente(request)).thenReturn(cliente);
         when(clienteRepository.save(cliente)).thenReturn(cliente);
         when(clienteMapper.toDomicilio(request.getDomicilio())).thenReturn(domicilio);
@@ -93,6 +94,7 @@ class GestoPagoClienteServiceImplTest {
         assertSame(cliente, usuario.getValue().getCliente());
         assertEquals("cliente@example.com", usuario.getValue().getCorreo());
         assertEquals("hash-bcrypt", usuario.getValue().getPasswordHash());
+        assertEquals("hash-pin", usuario.getValue().getPinHash());
         assertTrue(usuario.getValue().isActivo());
         assertEquals(7, response.getClienteId());
         assertEquals(cuenta.getValue().getNumeroCuenta(), response.getNumeroCuenta());
@@ -304,6 +306,7 @@ class GestoPagoClienteServiceImplTest {
         request.setRfc("CANO0504295G3");
         request.setCorreo("cliente@example.com");
         request.setContrasena("ClaveSegura1!");
+        request.setPin("123456");
         request.setDomicilio(new GestoPagoDomicilioRequest());
         return request;
     }

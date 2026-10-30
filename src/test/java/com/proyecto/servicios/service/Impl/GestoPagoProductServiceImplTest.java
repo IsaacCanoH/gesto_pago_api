@@ -1,50 +1,47 @@
 package com.proyecto.servicios.service.Impl;
 
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertThrows;
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.Mockito.doReturn;
+import static org.mockito.Mockito.inOrder;
+import static org.mockito.Mockito.spy;
+import static org.mockito.Mockito.times;
+import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.verifyNoInteractions;
+import static org.mockito.Mockito.when;
+
+import java.util.Collections;
+import java.util.List;
+import java.util.Optional;
+
 import com.proyecto.servicios.cache.GestoPagoProductoCache;
 import com.proyecto.servicios.client.GestoPagoProductClient;
 import com.proyecto.servicios.entity.gestopago.GestoPagoProducto;
 import com.proyecto.servicios.entity.gestopago.GestoPagoToken;
-import com.proyecto.servicios.mapper.GestoPagoProductoMapper;
-import com.proyecto.servicios.repositorys.gestopago.GestoPagoProductoRepository;
-import com.proyecto.servicios.service.GestoPagoTokenService;
-import com.proyecto.servicios.exception.GestoPagoExternalResponseException;
 import com.proyecto.servicios.exception.GestoPagoAuthenticationException;
 import com.proyecto.servicios.exception.GestoPagoCommunicationException;
-import com.proyecto.servicios.model.gestopago.GestoPagoProductoResponse;
+import com.proyecto.servicios.exception.GestoPagoExternalResponseException;
+import com.proyecto.servicios.mapper.GestoPagoProductoMapper;
 import com.proyecto.servicios.model.gestopago.GestoPagoProductoPaginaRequest;
+import com.proyecto.servicios.model.gestopago.GestoPagoProductoResponse;
+import com.proyecto.servicios.repositorys.gestopago.GestoPagoProductoRepository;
+import com.proyecto.servicios.service.GestoPagoTokenService;
 
 import feign.Request;
 import feign.RetryableException;
-
-import java.util.Collections;
-
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
-import org.springframework.data.domain.PageImpl;
-import org.springframework.data.domain.PageRequest;
-import org.springframework.data.domain.Pageable;
+import org.mockito.ArgumentCaptor;
+import org.mockito.InOrder;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
+import org.springframework.data.domain.PageImpl;
+import org.springframework.data.domain.PageRequest;
+import org.springframework.data.domain.Pageable;
 import org.springframework.test.util.ReflectionTestUtils;
-import org.mockito.InOrder;
-import static org.mockito.Mockito.inOrder;
-
-import java.util.List;
-import java.util.Optional;
-
-import static org.junit.jupiter.api.Assertions.assertEquals;
-import static org.mockito.ArgumentMatchers.any;
-import static org.mockito.ArgumentMatchers.anySet;
-import static org.mockito.Mockito.verify;
-import static org.mockito.Mockito.when;
-import static org.junit.jupiter.api.Assertions.assertThrows;
-import static org.mockito.Mockito.verifyNoInteractions;
-import static org.mockito.Mockito.times;
-import static org.mockito.Mockito.doReturn;
-import static org.mockito.Mockito.spy;
-import org.mockito.ArgumentCaptor;
 
 @ExtendWith(MockitoExtension.class)
 class GestoPagoProductServiceImplTest {
@@ -64,15 +61,17 @@ class GestoPagoProductServiceImplTest {
     @Mock
     private GestoPagoProductoCache productoCache;
 
+    @Mock
+    private GestoPagoCatalogoPersistenceService catalogoPersistenceService;
+
     @InjectMocks
     private GestoPagoProductServiceImpl gestoPagoProductService;
 
     @BeforeEach
     void setUp() {
-        ReflectionTestUtils.setField(
-                gestoPagoProductService, "idDistribuidor", 83);
-        ReflectionTestUtils.setField(
-                gestoPagoProductService, "codigoDispositivo", "GPS83-TPV-17");
+        ReflectionTestUtils.setField(gestoPagoProductService, "idDistribuidor", 83);
+        ReflectionTestUtils.setField(gestoPagoProductService,
+                "codigoDispositivo", "GPS83-TPV-17");
     }
 
     @Test
@@ -103,16 +102,13 @@ class GestoPagoProductServiceImplTest {
                 .thenReturn(Optional.of(token));
         when(gestoPagoProductClient.getProductList("Bearer token-prueba"))
                 .thenReturn(xml);
-        when(productoRepository.findAllByIdProductoIn(anySet()))
-                .thenReturn(List.of());
-        when(productoMapper.toEntity(any()))
-                .thenReturn(new GestoPagoProducto());
+        when(catalogoPersistenceService.guardarCatalogo(any())).thenReturn(1);
 
         int resultado = gestoPagoProductService.sincronizarProductos();
 
         assertEquals(1, resultado);
         verify(gestoPagoProductClient).getProductList("Bearer token-prueba");
-        verify(productoRepository).saveAll(any());
+        verify(catalogoPersistenceService).guardarCatalogo(any());
     }
 
     @Test
@@ -136,11 +132,28 @@ class GestoPagoProductServiceImplTest {
         when(gestoPagoProductClient.getProductList("Bearer token-prueba"))
                 .thenReturn(xml);
 
-        assertThrows(
-                GestoPagoExternalResponseException.class,
+        assertThrows(GestoPagoExternalResponseException.class,
                 () -> gestoPagoProductService.sincronizarProductos());
+        verifyNoInteractions(productoRepository, productoMapper,
+                catalogoPersistenceService);
+    }
 
-        verifyNoInteractions(productoRepository, productoMapper);
+    @Test
+    void catalogoVacioNoDesactivaProductosExistentes() {
+        GestoPagoToken token = new GestoPagoToken();
+        token.setToken("token-prueba");
+        token.setActivo(true);
+
+        when(gestoPagoTokenService.obtenerTokenActivo(83, "GPS83-TPV-17"))
+                .thenReturn(Optional.of(token));
+        when(gestoPagoProductClient.getProductList("Bearer token-prueba"))
+                .thenReturn(
+                        "<RESPONSE><MENSAJE><CODIGO>01</CODIGO></MENSAJE>"
+                                + "<PRODUCTOS/></RESPONSE>");
+
+        assertThrows(GestoPagoExternalResponseException.class,
+                () -> gestoPagoProductService.sincronizarProductos());
+        verifyNoInteractions(catalogoPersistenceService, productoCache);
     }
 
     @Test
@@ -168,8 +181,7 @@ class GestoPagoProductServiceImplTest {
         when(gestoPagoProductClient.getProductList("Bearer token-anterior"))
                 .thenThrow(new GestoPagoAuthenticationException(
                         "GestoPago rechazó la autenticación"));
-        when(gestoPagoTokenService.renovarTokenAhora())
-                .thenReturn(tokenNuevo);
+        when(gestoPagoTokenService.renovarTokenAhora()).thenReturn(tokenNuevo);
         when(gestoPagoProductClient.getProductList("Bearer token-nuevo"))
                 .thenReturn(xmlExitoso);
 
@@ -180,10 +192,8 @@ class GestoPagoProductServiceImplTest {
 
         assertEquals(0, productosRecibidos);
         verify(gestoPagoTokenService).renovarTokenAhora();
-        verify(gestoPagoProductClient)
-                .getProductList("Bearer token-anterior");
-        verify(gestoPagoProductClient)
-                .getProductList("Bearer token-nuevo");
+        verify(gestoPagoProductClient).getProductList("Bearer token-anterior");
+        verify(gestoPagoProductClient).getProductList("Bearer token-nuevo");
     }
 
     @Test
@@ -212,11 +222,10 @@ class GestoPagoProductServiceImplTest {
         when(gestoPagoProductClient.getProductList("Bearer token-prueba"))
                 .thenThrow(timeout);
 
-        assertThrows(
-                GestoPagoCommunicationException.class,
+        assertThrows(GestoPagoCommunicationException.class,
                 () -> gestoPagoProductService.descargarListaProductos());
-
-        verifyNoInteractions(productoRepository, productoMapper);
+        verifyNoInteractions(productoRepository, productoMapper,
+                catalogoPersistenceService);
     }
 
     @Test
@@ -226,19 +235,15 @@ class GestoPagoProductServiceImplTest {
         producto.setProducto("ABIB 100");
 
         List<GestoPagoProductoResponse> catalogo = List.of(producto);
+        when(productoCache.consultarTodos()).thenReturn(Optional.of(catalogo));
 
-        when(productoCache.consultarTodos())
-                .thenReturn(Optional.of(catalogo));
-
-        List<GestoPagoProductoResponse> resultado = gestoPagoProductService.consultarProductos();
+        List<GestoPagoProductoResponse> resultado =
+                gestoPagoProductService.consultarProductos();
 
         assertEquals(catalogo, resultado);
         verify(productoCache).consultarTodos();
-        verifyNoInteractions(
-                productoRepository,
-                productoMapper,
-                gestoPagoProductClient,
-                gestoPagoTokenService);
+        verifyNoInteractions(productoRepository, productoMapper,
+                gestoPagoProductClient, gestoPagoTokenService);
     }
 
     @Test
@@ -254,18 +259,16 @@ class GestoPagoProductServiceImplTest {
         List<GestoPagoProducto> entidades = List.of(entidad);
         List<GestoPagoProductoResponse> catalogo = List.of(producto);
 
-        when(productoCache.consultarTodos())
-                .thenReturn(Optional.empty());
-        when(productoRepository.findAll())
-                .thenReturn(entidades);
-        when(productoMapper.toResponseList(entidades))
-                .thenReturn(catalogo);
+        when(productoCache.consultarTodos()).thenReturn(Optional.empty());
+        when(productoRepository.findAllByActivoTrue()).thenReturn(entidades);
+        when(productoMapper.toResponseList(entidades)).thenReturn(catalogo);
 
-        List<GestoPagoProductoResponse> resultado = gestoPagoProductService.consultarProductos();
+        List<GestoPagoProductoResponse> resultado =
+                gestoPagoProductService.consultarProductos();
 
         assertEquals(catalogo, resultado);
         verify(productoCache).consultarTodos();
-        verify(productoRepository).findAll();
+        verify(productoRepository).findAllByActivoTrue();
         verify(productoMapper).toResponseList(entidades);
         verifyNoInteractions(gestoPagoProductClient, gestoPagoTokenService);
         verify(productoCache).guardarTodos(catalogo);
@@ -304,38 +307,31 @@ class GestoPagoProductServiceImplTest {
         List<GestoPagoProducto> entidades = List.of(entidad);
         List<GestoPagoProductoResponse> catalogo = List.of(producto);
 
-        when(productoCache.consultarTodos())
-                .thenReturn(Optional.empty());
-        when(productoRepository.findAll())
+        when(productoCache.consultarTodos()).thenReturn(Optional.empty());
+        when(productoRepository.findAllByActivoTrue())
                 .thenReturn(List.of())
                 .thenReturn(entidades);
         when(gestoPagoTokenService.obtenerTokenActivo(83, "GPS83-TPV-17"))
                 .thenReturn(Optional.of(token));
         when(gestoPagoProductClient.getProductList("Bearer token-prueba"))
                 .thenReturn(xml);
-        when(productoRepository.findAllByIdProductoIn(anySet()))
-                .thenReturn(List.of());
-        when(productoMapper.toEntity(any()))
-                .thenReturn(entidad);
-        when(productoMapper.toResponseList(entidades))
-                .thenReturn(catalogo);
+        when(catalogoPersistenceService.guardarCatalogo(any())).thenReturn(1);
+        when(productoMapper.toResponseList(entidades)).thenReturn(catalogo);
 
-        List<GestoPagoProductoResponse> resultado = gestoPagoProductService.consultarProductos();
+        List<GestoPagoProductoResponse> resultado =
+                gestoPagoProductService.consultarProductos();
 
         assertEquals(catalogo, resultado);
 
-        InOrder orden = inOrder(
-                productoCache,
-                productoRepository,
-                gestoPagoProductClient);
-
+        InOrder orden = inOrder(productoCache, productoRepository,
+                catalogoPersistenceService, gestoPagoProductClient);
         orden.verify(productoCache).consultarTodos();
-        orden.verify(productoRepository).findAll();
+        orden.verify(productoRepository).findAllByActivoTrue();
         orden.verify(gestoPagoProductClient)
                 .getProductList("Bearer token-prueba");
-        orden.verify(productoRepository).saveAll(entidades);
+        orden.verify(catalogoPersistenceService).guardarCatalogo(any());
         orden.verify(productoCache).invalidar();
-        orden.verify(productoRepository).findAll();
+        orden.verify(productoRepository).findAllByActivoTrue();
         orden.verify(productoCache).guardarTodos(catalogo);
     }
 
@@ -357,19 +353,25 @@ class GestoPagoProductServiceImplTest {
 
         assertEquals(3, pagina.getTotalElements());
         assertEquals(14302L, pagina.getContent().get(0).getIdProducto());
-        ArgumentCaptor<Pageable> paginacion = ArgumentCaptor.forClass(Pageable.class);
+
+        ArgumentCaptor<Pageable> paginacion =
+                ArgumentCaptor.forClass(Pageable.class);
         verify(productoRepository).findAll(paginacion.capture());
         assertEquals(1, paginacion.getValue().getPageNumber());
         assertEquals(2, paginacion.getValue().getPageSize());
-        assertEquals("idProducto", paginacion.getValue().getSort().iterator().next().getProperty());
-        verifyNoInteractions(productoCache, gestoPagoProductClient, gestoPagoTokenService);
+        assertEquals("idProducto",
+                paginacion.getValue().getSort().iterator().next().getProperty());
+        verifyNoInteractions(productoCache, gestoPagoProductClient,
+                gestoPagoTokenService);
     }
 
     @Test
     void paginaVaciaFueraDelRangoNoSincronizaSiExistenProductos() {
-        GestoPagoProductoPaginaRequest request = new GestoPagoProductoPaginaRequest();
+        GestoPagoProductoPaginaRequest request =
+                new GestoPagoProductoPaginaRequest();
         request.setPagina(2);
         request.setTamanio(2);
+
         when(productoRepository.findAll(any(Pageable.class)))
                 .thenReturn(new PageImpl<>(List.of(), PageRequest.of(2, 2), 3));
 
@@ -384,10 +386,14 @@ class GestoPagoProductServiceImplTest {
     void sincronizaSoloSiElCatalogoPaginadoEstaVacio() {
         GestoPagoProducto entidad = new GestoPagoProducto();
         entidad.setIdProducto(14302L);
-        GestoPagoProductoPaginaRequest request = new GestoPagoProductoPaginaRequest();
+
+        GestoPagoProductoPaginaRequest request =
+                new GestoPagoProductoPaginaRequest();
+
         when(productoRepository.findAll(any(Pageable.class)))
                 .thenReturn(new PageImpl<>(List.of()))
                 .thenReturn(new PageImpl<>(List.of(entidad)));
+
         var servicio = spy(gestoPagoProductService);
         doReturn(1).when(servicio).sincronizarProductos();
 

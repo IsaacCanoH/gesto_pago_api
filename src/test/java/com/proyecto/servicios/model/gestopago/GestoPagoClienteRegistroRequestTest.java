@@ -33,7 +33,7 @@ class GestoPagoClienteRegistroRequestTest {
 
         assertTrue(errores.containsAll(Set.of(
                 "nombre", "apellidoPaterno", "apellidoMaterno", "fechaNacimiento",
-                "curp", "rfc", "correo", "contrasena", "telefonoMovil",
+                "curp", "rfc", "correo", "contrasena", "pin", "telefonoMovil",
                 "sexo", "nacionalidad", "estadoCivil", "ocupacion", "empresa",
                 "ingresoMensual", "domicilio")));
     }
@@ -149,6 +149,17 @@ class GestoPagoClienteRegistroRequestTest {
             request.setContrasena(contrasena);
             assertFalse(valido(request, "contrasena"), contrasena);
         }
+    }
+
+    @Test
+    void pinDebeTenerSeisDigitos() {
+        var request = new GestoPagoClienteRegistroRequest();
+        for (String pin : List.of("12345", "1234567", "123a56")) {
+            request.setPin(pin);
+            assertFalse(valido(request, "pin"));
+        }
+        request.setPin("012345");
+        assertTrue(valido(request, "pin"));
     }
 
     @Test
